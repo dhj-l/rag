@@ -1,0 +1,114 @@
+# =============================================================================
+# 智能文档助手 — Docker Compose 全服务编排
+# 服务：MongoDB、Chroma、PostgreSQL（Langfuse 用）、Langfuse、后端、前端
+# =============================================================================
+#
+# 说明：T01 阶段后端/前端的 Dockerfile、nginx.conf 尚未创建（属 T05），
+#       因此 backend / frontend 两个服务在此先用注释占位，T05 补充 build 上下文后启用。
+#       T01 验证方式：`docker compose up -d mongodb chroma postgres langfuse`
+#       + 本地 `npm run dev` 启动前后端。
+# =============================================================================
+
+services:
+  # ----------------------------- 基础设施 -----------------------------
+  mongodb:
+    image: mongo:7
+    container_name: doc-assistant-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-rootpass}
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chroma:
+    # Chroma 向量库（全程使用，见架构 §8.3）
+    image: chromadb/chroma:latest
+    container_name: doc-assistant-chroma
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    # PostgreSQL：Langfuse 追踪数据存储
+    image: postgres:15
+    container_name: doc-assistant-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-langfuse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-langfuse}
+      POSTGRES_DB: ${POSTGRES_DB:-langfuse}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-langfuse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  langfuse:
+    # Langfuse Web + API（追踪可视化），依赖 postgres
+    image: langfuse/langfuse:latest
+    container_name: doc-assistant-langfuse
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-langfuse}:${POSTGRES_PASSWORD:-langfuse}@postgres:5432/${POSTGRES_DB:-langfuse}
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-in-prod}
+      SALT: ${SALT:-change-me-in-prod}
+      # 禁用可选的 ClickHouse / Redis（单机精简部署）
+      NEXT_PUBLIC_SIGN_UP_DISABLED: "false"
+
+  # ----------------------------- 应用层（T05 补充 Dockerfile 后启用）-----------------------------
+  # backend:
+  #   build: ./backend
+  #   container_name: doc-assistant-backend
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3000:3000"
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     mongodb:
+  #       condition: service_healthy
+  #     chroma:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./uploads:/app/uploads
+  #
+  # frontend:
+  #   build: ./frontend
+  #   container_name: doc-assistant-frontend
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #   depends_on:
+  #     - backend
+
+volumes:
+  mongo_data:
+  chroma_data:
+  postgres_data:

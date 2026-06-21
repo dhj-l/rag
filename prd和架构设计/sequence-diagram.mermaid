@@ -1,0 +1,211 @@
+%% 智能文档助手 — 核心调用流程时序图
+%% 包含：文档上传索引、RAG问答(含权限过滤)、Agent决策、SSE流式输出
+
+%% ========== 1. 文档上传索引流程 ==========
+sequenceDiagram
+    participant Admin as 管理员
+    participant FE as 前端
+    participant DC as DocumentController
+    participant DS as DocumentService
+    participant DP as DocumentProcessor
+    participant ES as EmbeddingService
+    participant VS as VectorStoreService
+    participant DB as MongoDB
+    participant FS as 文件系统
+
+    Admin->>FE: 选择文件 + 填写保密级别/部门
+    FE->>FE: 前端校验（文件大小≤20MB、格式、L2/L3必选部门）
+    FE->>DC: POST /api/documents/upload (multipart)
+    DC->>DS: createDocument(file, metadata)
+    DS->>FS: 保存文件到 uploads/
+    DS->>DB: 插入文档记录(status: uploaded)
+    DS-->>DC: documentId
+    DC-->>FE: 201 {documentId, status: "uploaded"}
+
+    par 异步索引处理
+        DS->>DP: processDocument(documentId)
+        DP->>DB: 更新 status = "parsing"
+        DP->>FS: 读取文件
+        DP->>DP: 解析文件内容(PDF/TXT/MD)
+        DP->>DP: 文本分割(RecursiveCharacterTextSplitter)
+        DP->>DB: 更新 status = "embedding"
+        DP->>ES: embedBatch(chunks[])
+        ES-->>DP: embeddings[][]
+        DP->>VS: addDocuments(chunks, embeddings, metadata)
+        Note over VS: metadata 含 securityLevel + department
+        VS->>VS: 存入 Chroma/Milvus
+        DP->>DB: 更新 status = "completed", chunkCount
+    end
+
+    loop 前端轮询（每2秒）
+        FE->>DC: GET /api/documents/:id/status
+        DC->>DB: 查询文档状态
+        DC-->>FE: {status: "parsing"/"embedding"/"completed"}
+        alt status == completed
+            FE->>FE: 停止轮询，更新文档状态为"已索引"
+        end
+    end
+
+%% ========== 2. RAG 问答流程（含权限过滤） ==========
+sequenceDiagram
+    participant U as 用户
+    participant FE as 前端
+    participant CC as ChatController
+    participant CS as ChatService
+    participant AS as AgentService
+    participant LF as LangfuseService
+    participant PS as PermissionService
+    participant RST as RagSearchTool
+    participant VS as VectorStoreService
+    participant LLM as LlmService
+    participant DB as MongoDB
+    participant AL as AuditLog
+
+    U->>FE: 输入问题"公司的加班制度是怎样的？"
+    FE->>CC: POST /api/sessions/:id/chat (SSE)
+    CC->>CS: sendMessage(sessionId, message, user)
+    CS->>DB: 保存用户消息(role: user)
+    CS->>AS: streamChat(sessionId, message, userContext)
+    AS->>LF: startTrace("rag_chat", {userId, query})
+    AS->>DB: 加载最近5轮历史消息
+    AS->>AS: 构建 Agent 输入(system prompt + history + query)
+    AS->>AS: Agent 决策(ReAct循环)
+    Note over AS: LLM 分析用户意图<br/>选择工具: rag_search
+
+    AS->>CC: SSE event: {"type":"tool","name":"rag_search"}
+    CC-->>FE: data: {"type":"tool","name":"rag_search"}
+    FE->>FE: 显示"正在检索文档..."
+
+    AS->>RST: invoke({query}, {context: {role, departments, userId}})
+    RST->>PS: buildVectorFilter(runtime.context)
+    Note over PS: role=employee, departments=["信息技术部"]<br/>accessibleLevels=[L1, L2]
+    PS-->>RST: VectorFilter{levels:[L1,L2], departments:["信息技术部"]}
+
+    RST->>VS: similaritySearch(query, filter, k=5)
+    Note over VS: 在过滤后的子空间中检索<br/>仅返回 L1 全部 + L2(信息技术部) 的片段
+    VS-->>RST: chunks[] (已过滤的5个最相关片段)
+
+    RST->>RST: 判断是否有检索结果
+    alt 有相关片段
+        RST->>LLM: stream(prompt: query + chunks context)
+        loop 逐 token 输出
+            LLM-->>RST: token
+            RST-->>AS: token
+            AS-->>CC: token
+            CC-->>FE: data: {"type":"token","content":"xxx"}
+            FE->>FE: 逐字渲染
+        end
+        RST-->>AS: {answer, sources, hasAnswer: true}
+    else 无相关片段
+        RST-->>AS: {answer: "文档中未提及相关内容", sources: [], hasAnswer: false}
+    end
+
+    AS->>CC: SSE event: {"type":"sources","data":[...]}
+    CC-->>FE: data: {"type":"sources","data":[...]}
+    AS->>CC: SSE event: {"type":"done"}
+    CC-->>FE: data: {"type":"done"}
+
+    par 异步保存
+        CS->>DB: 保存助手消息(role: assistant, content, sources, toolUsed)
+        CS->>DB: 更新 session.lastMessageAt
+    end
+
+    par 异步审计
+        CS->>AL: recordAudit({userId, action:"search", filterCondition, resultCount})
+        AL->>DB: 写入 audit_logs(含 TTL 90天)
+    end
+
+    AS->>LF: endTrace({tokenCount, duration})
+
+%% ========== 3. Agent 决策流程（createAgent + Middleware） ==========
+sequenceDiagram
+    participant AS as AgentService
+    participant MW as Middleware Pipeline
+    participant LLM as LlmService (ChatDeepSeek)
+    participant RS as RagSearchTool
+    participant SD as SummarizeTool
+    participant GC as GeneralChatTool
+
+    Note over AS: createAgent 构建<br/>model: ChatDeepSeek<br/>contextSchema: Zod(role, departments)<br/>middleware: [dynamicSystemPrompt,<br/>  summarization, modelRetry, toolRetry]
+
+    AS->>MW: 中间件管道处理
+    Note over MW: dynamicSystemPromptMiddleware<br/>按 role 动态生成 system prompt
+
+    AS->>LLM: Agent.stream({messages: [system, history, human]})
+    Note over LLM: ReAct 决策循环<br/>（createAgent 内置推理循环）
+
+    alt 用户提问文档知识
+        LLM->>RS: 调用 rag_search(query)
+        Note over RS: 通过 runtime.context<br/>获取权限数据构建过滤条件
+        RS-->>LLM: {answer, sources}
+        LLM->>LLM: 整合工具结果，生成最终回复
+    else 用户请求摘要
+        LLM->>SD: 调用 summarize_document(docId)
+        SD->>SD: runtime.context 校验权限
+        alt 有权限
+            SD-->>LLM: {summary, documentTitle}
+        else 无权限
+            SD-->>LLM: "您没有权限访问该文档"
+        end
+    else 通用闲聊
+        LLM->>GC: 调用 general_chat(query)
+        GC-->>LLM: {response}
+    end
+
+    Note over MW: summarizationMiddleware 触发（>4000 tokens）<br/>modelRetryMiddleware 重试（3次）<br/>toolRetryMiddleware 重试（2次）
+
+    LLM-->>AS: 流式输出最终回复(token by token)
+    AS-->>AS: 收集完整回复 + sources + toolUsed
+
+%% ========== 4. SSE 流式输出流程 ==========
+sequenceDiagram
+    participant FE as 前端 (fetch-event-source)
+    participant CC as ChatController
+    participant CS as ChatService
+    participant AS as AgentService
+    participant LLM as LlmService (ChatDeepSeek)
+    participant DeepSeek as DeepSeek API
+
+    FE->>CC: POST /api/sessions/:id/chat<br/>Header: Authorization: Bearer xxx<br/>Body: {message: "xxx"}
+    
+    Note over CC: 设置 SSE 响应头<br/>Content-Type: text/event-stream<br/>Cache-Control: no-cache<br/>Connection: keep-alive
+
+    CC->>CS: streamMessage(sessionId, message, user)
+    CS->>AS: streamChat(sessionId, message, userContext)
+
+    AS->>AS: Agent 决策选择工具
+    AS-->>CS: tool event {name: "rag_search"}
+    CS-->>CC: yield {type: "tool", name: "rag_search"}
+    CC-->>FE: data: {"type":"tool","name":"rag_search"}
+
+    AS->>LLM: stream(prompt)
+    LLM->>DeepSeek: POST /v1/chat/completions<br/>(stream=true, model=deepseek-chat)
+
+    loop DeepSeek 流式返回 token
+        DeepSeek-->>LLM: SSE chunk: {"choices":[{"delta":{"content":"根"}}]}
+        LLM-->>AS: token "根"
+        AS-->>CS: token "根"
+        CS-->>CC: yield {type: "token", content: "根"}
+        CC-->>FE: data: {"type":"token","content":"根"}
+        FE->>FE: 追加渲染"根"
+
+        DeepSeek-->>LLM: SSE chunk: {"choices":[{"delta":{"content":"据"}}]}
+        LLM-->>AS: token "据"
+        AS-->>CS: token "据"
+        CS-->>CC: yield {type: "token", content: "据"}
+        CC-->>FE: data: {"type":"token","content":"据"}
+        FE->>FE: 追加渲染"据"
+    end
+
+    DeepSeek-->>LLM: SSE: [DONE]
+    LLM-->>AS: stream complete
+    AS-->>CS: {sources: [...], toolUsed: "rag_search"}
+    CS-->>CC: yield {type: "sources", data: [...]}
+    CC-->>FE: data: {"type":"sources","data":[...]}
+    CS-->>CC: yield {type: "done"}
+    CC-->>FE: data: {"type":"done"}
+    CC-->>FE: [连接关闭]
+
+    FE->>FE: 渲染完整回复 + 来源引用可展开
+    
+    Note over AS,FE: ⚠️ createAgent v1 节点名变更<br/>流式事件中的内部节点名从 "agent" 变为 "model"<br/>前端或中间件监听时应使用 "model"

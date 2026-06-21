@@ -1,0 +1,253 @@
+%% 智能文档助手 — 核心数据结构关系类图
+
+classDiagram
+    class User {
+        +ObjectId _id
+        +string username
+        +string password
+        +string displayName
+        +Role role
+        +string[] departments
+        +UserStatus status
+        +Date createdAt
+        +Date updatedAt
+    }
+
+    class UserContext {
+        +string userId
+        +string username
+        +Role role
+        +string[] departments
+    }
+
+    class Document {
+        +ObjectId _id
+        +string title
+        +string filename
+        +FileType fileType
+        +number fileSize
+        +string filePath
+        +SecurityLevel securityLevel
+        +string department
+        +DocumentStatus status
+        +number chunkCount
+        +ObjectId uploadedBy
+        +string errorMessage
+        +Date createdAt
+        +Date updatedAt
+    }
+
+    class Session {
+        +ObjectId _id
+        +ObjectId userId
+        +string title
+        +Date lastMessageAt
+        +Date createdAt
+        +Date updatedAt
+    }
+
+    class Message {
+        +ObjectId _id
+        +ObjectId sessionId
+        +ObjectId userId
+        +MessageRole role
+        +string content
+        +SourceReference[] sources
+        +string toolUsed
+        +number tokenCount
+        +Date createdAt
+    }
+
+    class AuditLog {
+        +ObjectId _id
+        +ObjectId userId
+        +string username
+        +AuditAction action
+        +string resource
+        +string resourceId
+        +object filterCondition
+        +number resultCount
+        +string ipAddress
+        +Date createdAt
+        +Date expiresAt
+    }
+
+    class SourceReference {
+        +string documentId
+        +string documentTitle
+        +string chunkContent
+        +number chunkIndex
+        +number page
+        +SecurityLevel securityLevel
+    }
+
+    class VectorFilter {
+        +SecurityLevel[] accessibleLevels
+        +string[] departments
+        +boolean noRestriction
+    }
+
+    class PermissionService {
+        +buildVectorFilter(user: UserContext): VectorFilter
+        +buildMongoQuery(user: UserContext): object
+        +canAccessDocument(user: UserContext, doc: Document): boolean
+        +canViewSummary(user: UserContext, doc: Document): boolean
+        -getAccessibleLevels(role: Role): SecurityLevel[]
+        -needsDepartmentFilter(role: Role): boolean
+    }
+
+    class AgentService {
+        +contextSchema: ZodSchema
+        +middleware: Middleware[]
+        +streamChat(sessionId: string, query: string, user: UserContext): AsyncGenerator
+        -buildAgent(): Agent
+        -loadHistory(sessionId: string): BaseMessage[]
+        -buildSystemPrompt(role: Role): string
+    }
+
+    class RagSearchTool {
+        +invoke(input: RagSearchInput, runtime: Runtime): Promise~RagSearchOutput~
+        -searchWithPermission(query: string, filter: VectorFilter): Chunk[]
+        -generateAnswer(query: string, chunks: Chunk[]): AsyncGenerator~string~
+    }
+
+    class SummarizeTool {
+        +invoke(input: SummarizeInput, runtime: Runtime): Promise~SummarizeOutput~
+        -checkPermission(docId: string, user: UserContext): boolean
+    }
+
+    class GeneralChatTool {
+        +invoke(input: GeneralChatInput, runtime: Runtime): Promise~GeneralChatOutput~
+    }
+
+    class DocumentLoader <<interface>> {
+        +supports(fileType: FileType): boolean
+        +load(filePath: string): Promise~string~
+    }
+
+    class PDFLoader {
+        +supports(fileType: FileType): boolean
+        +load(filePath: string): Promise~string~
+    }
+
+    class TextLoader {
+        +supports(fileType: FileType): boolean
+        +load(filePath: string): Promise~string~
+    }
+
+    class MarkdownLoader {
+        +supports(fileType: FileType): boolean
+        +load(filePath: string): Promise~string~
+    }
+
+    class DocumentProcessorService {
+        -loaders: DocumentLoader[]
+        +processDocument(docId: string): Promise~void~
+        -parseFile(filePath: string, fileType: FileType): string
+        -chunkText(text: string): TextChunk[]
+        -updateStatus(docId: string, status: DocumentStatus): void
+        +registerLoader(loader: DocumentLoader): void
+    }
+
+    class VectorStoreService {
+        +addDocuments(chunks: TextChunk[], metadata: ChunkMetadata[]): Promise~void~
+        +similaritySearch(query: string, filter: VectorFilter, k: number): SearchResult[]
+        +deleteByDocumentId(docId: string): Promise~void~
+    }
+
+    class EmbeddingService {
+        +embedText(text: string): Promise~number[]~
+        +embedBatch(texts: string[]): Promise~number[][]~
+    }
+
+    class LlmService {
+        +getModel(): ChatDeepSeek
+        +chat(messages: BaseMessage[]): Promise~string~
+        +stream(messages: BaseMessage[], onToken: Function): Promise~string~
+    }
+
+    class LangfuseService {
+        +getCallbackHandler(): LangfuseCallbackHandler
+        +startTrace(name: string, metadata: object): string
+        +endTrace(traceId: string): void
+    }
+
+    class AuthService {
+        +login(dto: LoginDto): Promise~{token, user}~
+        +validateUser(username: string, password: string): Promise~User~
+        +generateToken(user: User): string
+    }
+
+    class DocumentService {
+        +upload(file: File, metadata: DocumentMetadata): Promise~Document~
+        +list(user: UserContext, page: number, pageSize: number): Promise~{list, total}~
+        +getStatus(docId: string): Promise~DocumentStatus~
+        +delete(docId: string): Promise~void~
+        +getSummary(docId: string, user: UserContext): Promise~string~
+    }
+
+    class SessionService {
+        +create(userId: string, title: string): Promise~Session~
+        +list(userId: string): Promise~Session[]~
+        +getById(id: string, userId: string): Promise~Session~
+        +delete(id: string, userId: string): Promise~void~
+        +rename(id: string, userId: string, title: string): Promise~void~
+    }
+
+    class ChatService {
+        +streamMessage(sessionId: string, message: string, user: UserContext): AsyncGenerator
+        -saveUserMessage(sessionId: string, content: string): Promise~void~
+        -saveAssistantMessage(sessionId: string, content: string, sources: SourceReference[]): Promise~void~
+    }
+
+    class AuditService {
+        +record(log: AuditLogInput): Promise~void~
+        +list(query: AuditQuery): Promise~{list, total}~
+    }
+
+    %% 数据模型关系
+    User --> UserContext : 映射为
+    User "1" --> "*" Document : uploads
+    User "1" --> "*" Session : owns
+    Session "1" --> "*" Message : contains
+    Message --> SourceReference : contains
+    User --> AuditLog : generates
+
+    %% 权限服务关系
+    UserContext --> PermissionService : provides context
+    Document --> PermissionService : checked by
+    PermissionService --> VectorFilter : generates
+    VectorFilter --> VectorStoreService : used in search
+
+    %% Agent 与工具关系
+    AgentService --> RagSearchTool : invokes
+    AgentService --> SummarizeTool : invokes
+    AgentService --> GeneralChatTool : invokes
+
+    %% 工具与服务关系
+    RagSearchTool --> VectorStoreService : searches
+    RagSearchTool --> PermissionService : uses for filtering
+    RagSearchTool --> LlmService : generates answer
+    SummarizeTool --> PermissionService : uses for permission check
+    SummarizeTool --> LlmService : generates summary
+    GeneralChatTool --> LlmService : generates response
+
+    %% 文档处理关系
+    DocumentProcessorService --> EmbeddingService : embeds chunks
+    DocumentProcessorService --> VectorStoreService : stores vectors
+    DocumentLoader <|.. PDFLoader : implements
+    DocumentLoader <|.. TextLoader : implements
+    DocumentLoader <|.. MarkdownLoader : implements
+    DocumentProcessorService --> DocumentLoader : uses *
+
+    %% 追踪关系
+    AgentService --> LangfuseService : traces
+    LlmService --> LangfuseService : traces
+
+    %% 业务服务关系
+    AuthService --> User : validates
+    DocumentService --> PermissionService : filters by
+    DocumentService --> DocumentProcessorService : triggers processing
+    DocumentService --> VectorStoreService : deletes vectors
+    ChatService --> AgentService : delegates to
+    ChatService --> AuditService : records audit
