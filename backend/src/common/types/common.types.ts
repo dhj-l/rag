@@ -156,3 +156,65 @@ export const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20971520
 
 /** 审计日志 TTL：90 天（§3.2 audit_logs.expiresAt） */
 export const AUDIT_LOG_TTL_DAYS = 90;
+
+// =============================================================================
+// T03 向量库/文档处理相关类型（§3.3, §3.5）
+// =============================================================================
+
+/** 向量库 chunk metadata（§3.3） */
+export interface ChunkMetadata {
+  documentId: string;
+  chunkIndex: number;
+  securityLevel: SecurityLevel;
+  department: string; // L1/L4 为 'all'，L2/L3 为具体部门名
+  title: string;
+  page: number; // 仅 PDF，其他类型为 0
+}
+
+/** 文本分块（DocumentProcessorService 输出） */
+export interface TextChunk {
+  pageContent: string;
+  metadata: ChunkMetadata;
+}
+
+/** 向量检索结果（VectorStoreService.similaritySearch 返回） */
+export interface SearchResult {
+  pageContent: string;
+  metadata: Record<string, unknown>;
+}
+
+/** RAG 检索工具输出（§3.5 rag_search） */
+export interface RagSearchOutput {
+  answer: string;
+  sources: SourceReference[];
+  hasAnswer: boolean;
+}
+
+/** 文档摘要工具输出（§3.5 summarize_document） */
+export interface SummarizeOutput {
+  summary: string;
+  documentTitle: string;
+}
+
+/** 通用闲聊工具输出（§3.5 general_chat） */
+export interface GeneralChatOutput {
+  response: string;
+}
+
+/** SSE 事件类型（§1.6） */
+export enum SSEEventType {
+  TOKEN = 'token',
+  SOURCES = 'sources',
+  TOOL = 'tool',
+  ERROR = 'error',
+  DONE = 'done',
+}
+
+/** SSE 事件结构 */
+export interface SSEEvent {
+  type: SSEEventType;
+  content?: string;
+  name?: string; // tool name
+  data?: SourceReference[];
+  message?: string; // error message
+}
