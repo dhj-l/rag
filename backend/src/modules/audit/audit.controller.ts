@@ -15,6 +15,17 @@ import { AuditService } from './audit.service';
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
+  /**
+   * 审计日志分页查询（GET /api/audit/logs，admin）
+   *
+   * - 权限：admin。
+   * - 查询参数（均可选，string 传入，service 内转 number）：
+   *   - page：页码，默认 1
+   *   - pageSize：每页条数，默认 20
+   *   - action：AuditAction 枚举值精确过滤（search/view_document/summarize/upload/delete/login/role_change）
+   *   - username：用户名模糊匹配（大小写不敏感）
+   * - 响应 data：`{ list: AuditLogResponse[], total }`，按 createdAt 倒序。
+   */
   @Get('logs')
   findAll(
     @Query('page') page?: string,

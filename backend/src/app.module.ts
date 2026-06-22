@@ -17,6 +17,13 @@ import { ChatModule } from './modules/chat/chat.module';
  */
 @Controller()
 class HealthController {
+  /**
+   * 健康检查（GET /health，公开）
+   *
+   * - 权限：公开，无需鉴权。
+   * - 响应 data：`{ status: 'ok' }`（经统一信封包装）。
+   * - 用途：探活 / 负载均衡健康检查。
+   */
   @Get('health')
   check() {
     return { status: 'ok' };

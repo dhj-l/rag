@@ -3,6 +3,7 @@ import { IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
 
 /** 创建会话 DTO（§3.6 POST /api/sessions） */
 export class CreateSessionDto {
+  /** 会话标题，可选；为空时默认「新会话」，首条消息后自动取前 20 字命名 */
   @IsOptional()
   @IsString()
   @IsNotEmpty({ message: '会话标题不能为空' })
@@ -11,6 +12,7 @@ export class CreateSessionDto {
 
 /** 重命名会话 DTO（§3.6 PATCH /api/sessions/:id） */
 export class UpdateSessionDto {
+  /** 新会话标题，必填非空 */
   @IsString()
   @IsNotEmpty({ message: '会话标题不能为空' })
   title!: string;
@@ -18,12 +20,14 @@ export class UpdateSessionDto {
 
 /** 会话列表查询 DTO */
 export class SessionListQueryDto {
+  /** 页码，默认 1，最小 1 */
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'page 必须为整数' })
   @Min(1, { message: 'page 最小为 1' })
   page?: number = 1;
 
+  /** 每页条数，默认 50，最小 1 */
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'pageSize 必须为整数' })
