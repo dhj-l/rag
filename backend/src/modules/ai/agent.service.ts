@@ -6,7 +6,8 @@ import {
   modelRetryMiddleware,
   toolRetryMiddleware,
 } from 'langchain';
-import { HumanMessage } from '@langchain/core/messages';
+import { HumanMessage, AIMessageChunk } from '@langchain/core/messages';
+import type { BaseMessage } from '@langchain/core/messages';
 import * as z from 'zod';
 import { LlmService } from './llm.service';
 import { LangfuseService } from './langfuse.service';
@@ -86,14 +87,23 @@ export class AgentService implements OnModuleInit {
   /**
    * 流式对话入口（§4.2 RAG 问答流程）
    *
-   * @param sessionId 会话 ID（用于 thread_id 关联对话历史）
+   * @param sessionId 会话 ID（用于 thread_id 关联 tracing）
    * @param query 用户当前输入
    * @param user 权限上下文
+   * @param history 多轮历史（§7.6，由 ChatService 从 MongoDB 加载最近 10 条）
    * @returns AsyncGenerator<SSEEvent>
+   *
+   * 说明：T03 createAgent 未配置 checkpointer，thread_id 不持久化；
+   * 多轮上下文按 §7.6 由调用方显式传入 history，前置到当前 HumanMessage 之前。
    */
-  async *streamChat(sessionId: string, query: string, user: UserContext): AsyncGenerator<SSEEvent> {
+  async *streamChat(
+    sessionId: string,
+    query: string,
+    user: UserContext,
+    history: BaseMessage[] = [],
+  ): AsyncGenerator<SSEEvent> {
     const input = {
-      messages: [new HumanMessage(query)],
+      messages: [...history, new HumanMessage(query)],
     };
 
     const config = {
@@ -109,13 +119,34 @@ export class AgentService implements OnModuleInit {
     const sources: SourceReference[] = [];
 
     try {
+      // streamMode: ['values','messages'] —— values 用于工具/来源检测，
+      // messages 用于逐 token 流式（v1 中 messages 模式自带 token 流，无需 streamTokens）
       const stream = await this.agent.stream(input, {
         ...config,
-        streamMode: 'values',
+        streamMode: ['values', 'messages'],
       });
 
       for await (const chunk of stream) {
-        const messages = (chunk as any)?.messages;
+        // 多模式流产出 [mode, value] 元组
+        const [mode, value] = chunk as [string, unknown];
+        if (mode !== 'values' && mode !== 'messages') continue;
+
+        if (mode === 'messages') {
+          // messages 模式下 value 为 [AIMessageChunk, metadata]
+          const [msg] = (value as [AIMessageChunk, unknown]) ?? [null];
+          if (
+            msg instanceof AIMessageChunk &&
+            typeof msg.content === 'string' &&
+            msg.content
+          ) {
+            fullContent += msg.content;
+            yield { type: SSEEventType.TOKEN, content: msg.content };
+          }
+          continue;
+        }
+
+        // values 模式：完整状态快照
+        const messages = (value as any)?.messages;
         if (!messages || !Array.isArray(messages)) continue;
 
         const lastMsg = messages[messages.length - 1];
@@ -128,18 +159,11 @@ export class AgentService implements OnModuleInit {
           continue;
         }
 
-        // 提取 AI 回复文本
-        if (lastMsg.content && lastMsg.type === 'ai') {
-          const content = typeof lastMsg.content === 'string' ? lastMsg.content : '';
-          if (content && content !== fullContent) {
-            fullContent = content;
-          }
-        }
-
         // 从工具结果中提取来源引用
         if (lastMsg.type === 'tool' && lastMsg.content) {
           try {
-            const parsed = typeof lastMsg.content === 'string' ? JSON.parse(lastMsg.content) : lastMsg.content;
+            const parsed =
+              typeof lastMsg.content === 'string' ? JSON.parse(lastMsg.content) : lastMsg.content;
             if (parsed?.sources && Array.isArray(parsed.sources)) {
               sources.push(...parsed.sources);
             }

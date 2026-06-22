@@ -7,6 +7,9 @@ import { AiModule } from './modules/ai/ai.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
+import { DocumentModule } from './modules/document/document.module';
+import { SessionModule } from './modules/session/session.module';
+import { ChatModule } from './modules/chat/chat.module';
 
 /**
  * 健康检查端点（T01 骨架）
@@ -43,6 +46,9 @@ class HealthController {
     AuditModule,
     UserModule,
     AuthModule,
+    DocumentModule,
+    SessionModule,
+    ChatModule,
   ],
   controllers: [HealthController],
 })

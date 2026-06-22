@@ -135,3 +135,32 @@ export type SSEEvent =
   | { type: SSEEventType.TOOL; name: string }
   | { type: SSEEventType.ERROR; message: string }
   | { type: SSEEventType.DONE };
+
+// =============================================================================
+// 会话与消息（§3.2 sessions / messages）
+// =============================================================================
+
+/** 会话（§3.2 sessions） */
+export interface Session {
+  id: string;
+  title: string;
+  lastMessageAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** 消息（§3.2 messages） */
+export interface Message {
+  id: string;
+  role: MessageRole;
+  content: string;
+  sources?: SourceReference[];
+  toolUsed?: string;
+  tokenCount?: number;
+  createdAt: string;
+}
+
+/** 会话详情（含消息历史，GET /api/sessions/:id） */
+export interface SessionDetail extends Session {
+  messages: Message[];
+}

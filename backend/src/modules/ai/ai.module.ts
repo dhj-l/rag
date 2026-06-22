@@ -1,5 +1,4 @@
 import { Global, Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
 import { PermissionService } from './permission.service';
 import { LlmService } from './llm.service';
 import { EmbeddingService } from './embedding.service';
@@ -10,12 +9,15 @@ import { LangfuseService } from './langfuse.service';
 import { RagSearchTool } from './tools/rag-search.tool';
 import { SummarizeTool } from './tools/summarize.tool';
 import { GeneralChatTool } from './tools/general-chat.tool';
-import { DocumentSchema } from './document.schema';
 
 /**
  * AI 模块（ARCHITECTURE.md §1.1 / T03 全部 AI 核心服务注册）
  *
  * @Global() 定位为架构级共享模块，T04 各业务模块可直接注入任何 AI 服务。
+ *
+ * 注：documents 集合的 Mongoose Schema 已迁移至 DocumentModule（T04），
+ * DocumentProcessorService 通过回调机制解耦、SummarizeTool 通过 raw
+ * connection.collection('documents') 访问，故 AiModule 不再注册 Document 模型。
  *
  * 注册的服务：
  * - PermissionService（T01 已有）：权限过滤核心
@@ -29,9 +31,6 @@ import { DocumentSchema } from './document.schema';
  */
 @Global()
 @Module({
-  imports: [
-    MongooseModule.forFeature([{ name: 'Document', schema: DocumentSchema }]),
-  ],
   providers: [
     // 核心跨模块服务（T01）
     PermissionService,
