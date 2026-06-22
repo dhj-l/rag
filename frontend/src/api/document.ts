@@ -75,3 +75,15 @@ export async function getDocumentSummary(id: string): Promise<DocumentSummaryRes
 export async function deleteDocument(id: string): Promise<void> {
   await client.delete(`/documents/${id}`);
 }
+
+/** PATCH /api/documents/:id（admin，调整保密级别/部门并重索引，§8.5） */
+export async function updateDocumentSecurity(
+  id: string,
+  payload: { securityLevel: SecurityLevel; department?: string },
+): Promise<Document> {
+  const { data } = await client.patch<ApiResponse<Document>, { data: Document }>(
+    `/documents/${id}`,
+    payload,
+  );
+  return data;
+}

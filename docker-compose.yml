@@ -3,10 +3,10 @@
 # 服务：MongoDB、Chroma、PostgreSQL（Langfuse 用）、Langfuse、后端、前端
 # =============================================================================
 #
-# 说明：T01 阶段后端/前端的 Dockerfile、nginx.conf 尚未创建（属 T05），
-#       因此 backend / frontend 两个服务在此先用注释占位，T05 补充 build 上下文后启用。
-#       T01 验证方式：`docker compose up -d mongodb chroma postgres langfuse`
-#       + 本地 `npm run dev` 启动前后端。
+# 一键启动：docker compose up --build -d
+# 访问：http://localhost （前端 Nginx 80 端口）
+#
+# T05 已补充 backend/frontend 的 Dockerfile 与 nginx.conf，启用全栈。
 # =============================================================================
 
 services:
@@ -79,36 +79,36 @@ services:
       NEXTAUTH_URL: http://localhost:3001
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-in-prod}
       SALT: ${SALT:-change-me-in-prod}
-      # 禁用可选的 ClickHouse / Redis（单机精简部署）
       NEXT_PUBLIC_SIGN_UP_DISABLED: "false"
 
-  # ----------------------------- 应用层（T05 补充 Dockerfile 后启用）-----------------------------
-  # backend:
-  #   build: ./backend
-  #   container_name: doc-assistant-backend
-  #   restart: unless-stopped
-  #   ports:
-  #     - "3000:3000"
-  #   env_file:
-  #     - .env
-  #   depends_on:
-  #     mongodb:
-  #       condition: service_healthy
-  #     chroma:
-  #       condition: service_healthy
-  #   volumes:
-  #     - ./uploads:/app/uploads
-  #
-  # frontend:
-  #   build: ./frontend
-  #   container_name: doc-assistant-frontend
-  #   restart: unless-stopped
-  #   ports:
-  #     - "80:80"
-  #   depends_on:
-  #     - backend
+  # ----------------------------- 应用层 ------------------------------
+  backend:
+    build: ./backend
+    container_name: doc-assistant-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      chroma:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
+
+  frontend:
+    build: ./frontend
+    container_name: doc-assistant-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
 
 volumes:
   mongo_data:
   chroma_data:
   postgres_data:
+  uploads_data:

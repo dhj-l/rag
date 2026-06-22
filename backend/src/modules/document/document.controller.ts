@@ -6,6 +6,7 @@ import {
   HttpException,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UploadedFile,
@@ -21,7 +22,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role, UserContext } from '../../common/types/common.types';
 import { deriveFileType } from './document.service';
 import { DocumentService } from './document.service';
-import { DocumentListQueryDto, UploadDocumentDto } from './dto/document.dto';
+import { DocumentListQueryDto, UpdateDocumentSecurityDto, UploadDocumentDto } from './dto/document.dto';
 
 /**
  * Multer fileFilter：MIME + 扩展名双校验（§7.5）
@@ -85,6 +86,16 @@ export class DocumentController {
   @Get(':id/summary')
   getSummary(@Param('id') id: string, @CurrentUser() user: UserContext) {
     return this.documentService.getSummary(id, user);
+  }
+
+  @Patch(':id')
+  @Roles(Role.ADMIN)
+  updateSecurity(
+    @Param('id') id: string,
+    @Body() dto: UpdateDocumentSecurityDto,
+    @CurrentUser() user: UserContext,
+  ) {
+    return this.documentService.updateSecurity(id, dto, user);
   }
 
   @Delete(':id')

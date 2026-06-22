@@ -11,26 +11,43 @@ const router = createRouter({
       meta: { public: true },
     },
     {
-      path: '/',
-      name: 'Home',
-      component: () => import('@/views/HomeView.vue'),
+      path: '/chat/:id?',
+      name: 'Chat',
+      component: () => import('@/views/ChatView.vue'),
     },
+    {
+      path: '/admin',
+      name: 'Admin',
+      component: () => import('@/views/AdminView.vue'),
+      meta: { requiresAdmin: true },
+    },
+    // 根路径重定向到对话页
+    { path: '/', redirect: '/chat' },
     // 404 兜底
-    { path: '/:pathMatch(.*)*', redirect: '/' },
+    { path: '/:pathMatch(.*)*', redirect: '/chat' },
   ],
 });
 
-/** 路由守卫（T02 实现要点 6）：未登录 → /login；已登录访问 /login → / */
+/**
+ * 路由守卫（T02 实现要点 6 + T05 管理员守卫）
+ * - 未登录访问受保护页 → /login
+ * - 已登录访问 /login → /chat
+ * - 非管理员访问 /admin → /chat
+ */
 router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore();
   const loggedIn = authStore.isLoggedIn;
 
   if (to.path === '/login') {
-    return loggedIn ? next('/') : next();
+    return loggedIn ? next('/chat') : next();
   }
 
   if (!to.meta.public && !loggedIn) {
     return next('/login');
+  }
+
+  if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    return next('/chat');
   }
 
   next();

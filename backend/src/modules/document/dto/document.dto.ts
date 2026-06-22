@@ -37,3 +37,17 @@ export class DocumentListQueryDto {
   @Min(1, { message: 'pageSize 最小为 1' })
   pageSize?: number = 20;
 }
+
+/**
+ * 调整文档保密级别/部门 DTO（§8.5 重索引）
+ * securityLevel 变更或 department 变更均触发向量库清理 + 重新索引。
+ */
+export class UpdateDocumentSecurityDto {
+  @IsEnum(SecurityLevel, { message: '保密级别必须为 L1 / L2 / L3 / L4' })
+  securityLevel!: SecurityLevel;
+
+  @ValidateIf((o) => o.securityLevel === SecurityLevel.L2 || o.securityLevel === SecurityLevel.L3)
+  @IsString()
+  @IsNotEmpty({ message: 'L2/L3 级别文档必须指定所属部门' })
+  department?: string;
+}

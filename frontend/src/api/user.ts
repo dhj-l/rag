@@ -1,7 +1,7 @@
 import { client } from './client';
 import type { ApiResponse } from '@/types';
 
-interface UserResponse {
+export interface UserResponse {
   id: string;
   username: string;
   displayName: string;

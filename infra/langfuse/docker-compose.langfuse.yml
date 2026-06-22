@@ -1,0 +1,44 @@
+# Langfuse 独立编排（含 PostgreSQL）
+# 供不想在主 docker-compose.yml 中拉 Langfuse 时使用
+#
+# 启动：docker compose -f infra/langfuse/docker-compose.langfuse.yml up -d
+# 访问：http://localhost:3001
+
+version: "3.8"
+services:
+  langfuse-postgres:
+    image: postgres:15
+    container_name: langfuse-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    volumes:
+      - langfuse_pg_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  langfuse:
+    image: langfuse/langfuse:latest
+    container_name: langfuse
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    depends_on:
+      langfuse-postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-postgres:5432/langfuse
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: change-me-in-prod
+      SALT: change-me-in-prod
+      NEXT_PUBLIC_SIGN_UP_DISABLED: "false"
+
+volumes:
+  langfuse_pg_data:

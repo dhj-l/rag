@@ -1,7 +1,9 @@
 <script setup lang="ts">
-// T02：路由出口；T05 将替换为 AppLayout 三栏布局包裹 RouterView
+import AppLayout from '@/components/layout/AppLayout.vue';
 </script>
 
 <template>
-  <RouterView />
+  <AppLayout>
+    <RouterView />
+  </AppLayout>
 </template>

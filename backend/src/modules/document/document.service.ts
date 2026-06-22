@@ -18,7 +18,7 @@ import { VectorStoreService } from '../ai/vector-store.service';
 import { LlmService } from '../ai/llm.service';
 import { AuditService } from '../audit/audit.service';
 import { Document, DocumentDocument, DocumentResponse } from './document.schema';
-import { UploadDocumentDto, DocumentListQueryDto } from './dto/document.dto';
+import { UploadDocumentDto, DocumentListQueryDto, UpdateDocumentSecurityDto } from './dto/document.dto';
 
 /** 扩展名 → FileType 映射（§7.5 支持格式） */
 const EXT_FILE_TYPE: Record<string, FileType> = {
@@ -243,6 +243,66 @@ export class DocumentService {
     });
 
     return { summary, documentTitle: doc.title };
+  }
+
+  /**
+   * 调整文档保密级别/部门并重新索引（§8.5）
+   *
+   * 流程：更新 MongoDB 的 securityLevel/department → 删除旧向量索引
+   * → 异步重跑处理流水线（用新 metadata 重新分块/向量化/入库）。
+   * 返回更新后的文档信息（status 回到 uploaded/parsing）。
+   */
+  async updateSecurity(
+    id: string,
+    dto: UpdateDocumentSecurityDto,
+    user: UserContext,
+  ): Promise<DocumentResponse> {
+    const doc = await this.documentModel.findById(id).exec();
+    if (!doc) {
+      throw new HttpException('文档不存在', HttpStatus.NOT_FOUND);
+    }
+    if (!doc.filePath || !existsSync(doc.filePath)) {
+      throw new HttpException('文档文件不可用，无法重新索引', HttpStatus.BAD_REQUEST);
+    }
+
+    const newLevel = dto.securityLevel;
+    const newDepartment = dto.department ?? 'all';
+
+    // 1. 更新 MongoDB 字段 + 状态回到 uploaded
+    doc.securityLevel = newLevel as any;
+    doc.department = newDepartment;
+    doc.status = DocumentStatus.UPLOADED;
+    doc.errorMessage = undefined;
+    doc.chunkCount = 0;
+    await doc.save();
+
+    // 2. 删除旧向量索引
+    try {
+      await this.vectorStoreService.deleteByDocumentId(id);
+    } catch (err) {
+      this.logger.warn(`[${id}] 重索引前删除旧向量失败（忽略）：${err}`);
+    }
+
+    // 3. 异步重跑处理流水线
+    void this.processAsync(
+      id,
+      doc.filePath,
+      doc.fileType,
+      newLevel,
+      newDepartment,
+      doc.title,
+    );
+
+    await this.auditService.record({
+      user,
+      action: AuditAction.UPLOAD,
+      resource: 'document',
+      resourceId: id,
+      filterCondition: { securityLevel: newLevel, department: newDepartment, reindex: true },
+    });
+
+    this.logger.log(`[${id}] 文档保密级别调整为 ${newLevel}/${newDepartment}，触发重新索引`);
+    return this.toResponse(doc);
   }
 
   /** 删除文档（admin）：文件 + 向量库 + MongoDB 记录（§5.3 要点 4） */
