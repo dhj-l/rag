@@ -115,11 +115,11 @@ onMounted(() => {
 <template>
   <div class="flex h-full flex-col">
     <!-- 栏头 -->
-    <div class="flex items-center justify-between border-b border-slate-200 px-3 py-2.5">
-      <span class="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-        <FileTextOutlined class="text-slate-400" />
+    <div class="flex items-center justify-between border-b border-slate-200 px-3 py-2.5 dark:border-slate-800">
+      <span class="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
+        <FileTextOutlined class="text-slate-400 dark:text-slate-500" />
         文档库
-        <span class="rounded-full bg-slate-100 px-1.5 text-[11px] font-medium text-slate-500">{{ list.length }}</span>
+        <span class="rounded-full bg-slate-100 px-1.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">{{ list.length }}</span>
       </span>
       <a-button type="text" size="small" @click="refresh">
         <template #icon><ReloadOutlined /></template>
@@ -139,11 +139,11 @@ onMounted(() => {
         v-else-if="!list.length"
         class="flex flex-col items-center justify-center px-4 py-12 text-center"
       >
-        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
           <FileTextOutlined style="font-size: 20px;" />
         </div>
-        <p class="mt-3 text-sm text-slate-500">暂无文档</p>
-        <p class="mt-1 text-xs text-slate-400">在管理后台上传文档以构建知识库</p>
+        <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">暂无文档</p>
+        <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">在管理后台上传文档以构建知识库</p>
       </div>
 
       <a-space v-else direction="vertical" :size="8" style="width: 100%;">
@@ -151,17 +151,17 @@ onMounted(() => {
           v-for="doc in list"
           :key="doc.id"
           size="small"
-          class="rounded-lg shadow-soft transition-shadow hover:shadow-card"
+          class="rounded-lg shadow-soft ring-1 ring-slate-200/60 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card dark:ring-slate-800"
         >
           <!-- 文档信息行 -->
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0 flex-1">
-              <div class="truncate text-sm font-medium text-slate-800">{{ doc.title }}</div>
+              <div class="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ doc.title }}</div>
               <div class="mt-1.5 flex flex-wrap items-center gap-1">
                 <a-tag :color="fileTypeColor[doc.fileType] || 'default'" class="text-[10px] leading-[18px]">{{ doc.fileType }}</a-tag>
-                <span class="text-[11px] text-slate-400">{{ (doc.fileSize / 1024).toFixed(1) }}KB</span>
+                <span class="text-[11px] text-slate-400 dark:text-slate-500">{{ (doc.fileSize / 1024).toFixed(1) }}KB</span>
                 <a-tag :color="securityLevelColor[doc.securityLevel] || 'default'" class="text-[10px] leading-[18px]">{{ doc.securityLevel }}</a-tag>
-                <span v-if="doc.department && doc.department !== 'all'" class="text-[11px] text-slate-400">{{ doc.department }}</span>
+                <span v-if="doc.department && doc.department !== 'all'" class="text-[11px] text-slate-400 dark:text-slate-500">{{ doc.department }}</span>
               </div>
             </div>
           </div>
@@ -206,7 +206,7 @@ onMounted(() => {
       width="520px"
     >
       <a-spin :spinning="summaryModal.loading">
-        <p class="whitespace-pre-wrap text-sm leading-7 text-slate-600">{{ summaryModal.content || '暂无摘要内容' }}</p>
+        <p class="whitespace-pre-wrap text-sm leading-7 text-slate-600 dark:text-slate-300">{{ summaryModal.content || '暂无摘要内容' }}</p>
       </a-spin>
     </a-modal>
 

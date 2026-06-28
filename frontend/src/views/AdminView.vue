@@ -11,14 +11,11 @@ import { DEPARTMENTS, ROLE_LABELS } from '@/constants';
 import { Role, UserStatus } from '@/types';
 import { createUserRules, departmentOptions } from '@/config/form-rules';
 import { userTableColumns } from '@/config/table-columns';
-import DocumentUpload from '@/components/document/DocumentUpload.vue';
-import DocumentList from '@/components/document/DocumentList.vue';
 import { PlusOutlined } from '@ant-design/icons-vue';
 import type { FormInstance } from 'ant-design-vue';
 import { message } from 'ant-design-vue';
 
-type Tab = 'users' | 'documents';
-const activeTab = ref<Tab>('users');
+const activeTab = ref<'users'>('users');
 
 // ===== 用户管理 =====
 const users = ref<UserResponse[]>([]);
@@ -133,21 +130,18 @@ async function toggleStatus(u: UserResponse) {
   }
 }
 
-const tabItems = [
-  { key: 'users', label: '用户管理' },
-  { key: 'documents', label: '文档管理' },
-];
+const tabItems = [{ key: 'users', label: '用户管理' }];
 
 onMounted(fetchUsers);
 </script>
 
 <template>
-  <div class="scrollbar-thin h-full overflow-y-auto bg-slate-50 p-6">
+  <div class="scrollbar-thin h-full overflow-y-auto bg-slate-50 p-6 dark:bg-slate-950">
     <div class="mx-auto max-w-5xl">
       <!-- 页面头 -->
-      <div class="mb-4">
-        <h1 class="text-lg font-semibold text-slate-900">管理后台</h1>
-        <p class="mt-0.5 text-xs text-slate-400">管理用户、权限与文档资源</p>
+      <div class="mb-5">
+        <h1 class="text-xl font-bold text-slate-900 dark:text-slate-100">管理后台</h1>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">管理用户、权限与文档资源</p>
       </div>
 
       <a-tabs v-model:activeKey="activeTab" :items="tabItems" />
@@ -155,12 +149,12 @@ onMounted(fetchUsers);
       <!-- 用户管理 -->
       <div
         v-if="activeTab === 'users'"
-        class="rounded-lg border border-slate-200 bg-white p-4 shadow-soft"
+        class="rounded-xl border border-slate-200/70 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900"
       >
         <div class="mb-3 flex items-center justify-between">
-          <span class="text-sm font-semibold text-slate-700">
+          <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">
             用户列表
-            <span class="font-normal text-slate-400">（{{ users.length }}）</span>
+            <span class="font-normal text-slate-400 dark:text-slate-500">（{{ users.length }}）</span>
           </span>
           <a-button type="primary" size="small" @click="showCreate = !showCreate">
             <template #icon><PlusOutlined /></template>
@@ -173,8 +167,7 @@ onMounted(fetchUsers);
           v-if="showCreate"
           size="small"
           :bordered="false"
-          class="mb-4"
-          style="background: #f8fafc;"
+          class="mb-4 bg-slate-50 dark:bg-slate-800/50"
         >
           <a-form
             ref="createFormRef"
@@ -236,7 +229,7 @@ onMounted(fetchUsers);
               <a-tag>{{ ROLE_LABELS[record.role] || record.role }}</a-tag>
             </template>
             <template v-else-if="column.key === 'departments'">
-              <span class="text-xs text-slate-500">{{ record.departments.join('、') || '—' }}</span>
+              <span class="text-xs text-slate-500 dark:text-slate-400">{{ record.departments.join('、') || '—' }}</span>
             </template>
             <template v-else-if="column.key === 'status'">
               <a-tag :color="record.status === 'active' ? 'green' : 'red'">
@@ -262,16 +255,6 @@ onMounted(fetchUsers);
           </template>
         </a-table>
       </div>
-
-      <!-- 文档管理 -->
-      <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div class="rounded-lg border border-slate-200 bg-white shadow-soft">
-          <DocumentUpload />
-        </div>
-        <div class="rounded-lg border border-slate-200 bg-white shadow-soft">
-          <DocumentList admin />
-        </div>
-      </div>
     </div>
 
     <!-- 角色修改弹窗 -->
@@ -282,7 +265,7 @@ onMounted(fetchUsers);
       cancel-text="取消"
       @ok="confirmRoleChange"
     >
-      <p class="mb-3 text-sm text-slate-500">用户：{{ roleModal.username }}</p>
+      <p class="mb-3 text-sm text-slate-500 dark:text-slate-400">用户：{{ roleModal.username }}</p>
       <a-select v-model:value="roleModal.role" :options="roleOptions" style="width: 100%;" />
     </a-modal>
 
@@ -294,7 +277,7 @@ onMounted(fetchUsers);
       cancel-text="取消"
       @ok="confirmDeptChange"
     >
-      <p class="mb-3 text-sm text-slate-500">用户：{{ deptModal.username }}</p>
+      <p class="mb-3 text-sm text-slate-500 dark:text-slate-400">用户：{{ deptModal.username }}</p>
       <a-select
         v-model:value="deptModal.departments"
         mode="multiple"

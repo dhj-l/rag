@@ -31,7 +31,7 @@ const securityColor: Record<string, string> = {
     >
       <a-collapse-panel key="sources" :show-arrow="false">
         <template #header>
-          <a-space :size="4" class="text-xs text-slate-500">
+          <a-space :size="4" class="text-xs text-slate-500 dark:text-slate-400">
             <LinkOutlined />
             <span>来源：{{ sources.length }} 条引用</span>
           </a-space>
@@ -42,16 +42,16 @@ const securityColor: Record<string, string> = {
             :key="i"
             size="small"
             :bordered="false"
-            class="rounded-lg bg-slate-50 transition-colors hover:bg-slate-100"
+            class="rounded-lg bg-slate-50 transition-colors hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800"
           >
             <div class="mb-1.5 flex items-center justify-between">
-              <span class="text-xs font-semibold text-slate-700">{{ src.documentTitle }}</span>
+              <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ src.documentTitle }}</span>
               <a-tag :color="securityColor[src.securityLevel] || 'default'" class="text-[10px] leading-[18px]">
                 {{ src.securityLevel }}
               </a-tag>
             </div>
-            <p class="mb-1 line-clamp-3 text-xs leading-relaxed text-slate-500">{{ src.chunkContent }}</p>
-            <div class="text-[11px] text-slate-400">
+            <p class="mb-1 line-clamp-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{{ src.chunkContent }}</p>
+            <div class="text-[11px] text-slate-400 dark:text-slate-500">
               片段 #{{ src.chunkIndex }}<span v-if="src.page"> · 第 {{ src.page }} 页</span>
             </div>
           </a-card>

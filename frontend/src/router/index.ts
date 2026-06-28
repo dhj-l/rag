@@ -21,6 +21,12 @@ const router = createRouter({
       component: () => import('@/views/AdminView.vue'),
       meta: { requiresAdmin: true },
     },
+    {
+      path: '/documents',
+      name: 'Documents',
+      component: () => import('@/views/DocumentView.vue'),
+      meta: { requiresAdmin: true },
+    },
     // 根路径重定向到对话页
     { path: '/', redirect: '/chat' },
     // 404 兜底

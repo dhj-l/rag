@@ -21,8 +21,9 @@ export default () => ({
   },
 
   embedding: {
-    apiKey: process.env.DASHSCOPE_API_KEY ?? '',
-    model: process.env.EMBEDDING_MODEL ?? 'text-embedding-v3',
+    apiKey: process.env.SILICONFLOW_API_KEY ?? '',
+    model: process.env.EMBEDDING_MODEL ?? 'Qwen/Qwen3-Embedding-0.6B',
+    baseUrl: process.env.SILICONFLOW_BASE_URL ?? 'https://api.siliconflow.cn/v1',
   },
 
   jwt: {

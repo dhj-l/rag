@@ -28,7 +28,7 @@ export class Document {
   @Prop({ type: Number, required: true })
   fileSize!: number;
 
-  @Prop({ type: String, required: true })
+  @Prop({ type: String })
   filePath!: string;
 
   @Prop({ type: String, required: true, enum: Object.values(SecurityLevel) })

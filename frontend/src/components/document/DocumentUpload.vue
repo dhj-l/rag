@@ -117,8 +117,8 @@ async function submit() {
           <p class="ant-upload-drag-icon mb-2">
             <InboxOutlined class="text-brand-500" style="font-size: 36px;" />
           </p>
-          <p class="ant-upload-text text-[13px] font-medium text-slate-600">点击或拖拽文件到此处上传</p>
-          <p class="ant-upload-hint mt-1 text-xs text-slate-400">支持 PDF / TXT / Markdown（≤20MB）</p>
+          <p class="ant-upload-text text-[13px] font-medium text-slate-600 dark:text-slate-300">点击或拖拽文件到此处上传</p>
+          <p class="ant-upload-hint mt-1 text-xs text-slate-400 dark:text-slate-500">支持 PDF / TXT / Markdown（≤20MB）</p>
         </a-upload-dragger>
       </a-form-item>
 

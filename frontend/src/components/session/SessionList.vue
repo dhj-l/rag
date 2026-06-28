@@ -55,11 +55,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col bg-white">
+  <div class="flex h-full flex-col bg-white dark:bg-slate-900">
     <!-- 栏头 -->
-    <div class="flex items-center justify-between border-b border-slate-200 px-3 py-2.5">
-      <span class="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-        <MessageOutlined class="text-slate-400" />
+    <div class="flex items-center justify-between border-b border-slate-200 px-3 py-2.5 dark:border-slate-800">
+      <span class="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
+        <MessageOutlined class="text-slate-400 dark:text-slate-500" />
         会话
       </span>
       <a-button type="primary" size="small" @click="createSession">
@@ -76,24 +76,23 @@ onMounted(() => {
         style="display: flex; justify-content: center; padding: 16px;"
       />
 
-      <!-- 空状态 -->
-      <div
-        v-else-if="!sessions.length"
-        class="flex flex-col items-center justify-center px-4 py-10 text-center"
-      >
-        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+      <!-- 骨架屏（首次加载中且已有占位需求时由 loading 兜底，此处保留空状态） -->
+      <div v-else-if="!sessions.length" class="flex flex-col items-center justify-center px-4 py-10 text-center">
+        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
           <MessageOutlined style="font-size: 20px;" />
         </div>
-        <p class="mt-3 text-sm text-slate-500">暂无会话</p>
-        <p class="mt-1 text-xs text-slate-400">点击「新建」开始对话</p>
+        <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">暂无会话</p>
+        <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">点击「新建」开始对话</p>
       </div>
 
       <a-list v-else :data-source="sessions" :split="false" size="small">
         <template #renderItem="{ item: s }">
           <a-list-item
             :class="[
-              'group relative mb-0.5 cursor-pointer overflow-hidden rounded-lg px-3 py-2.5 transition-colors',
-              s.id === currentId ? 'bg-brand-50' : 'hover:bg-slate-100',
+              'group relative mb-0.5 cursor-pointer overflow-hidden rounded-lg px-3 py-2.5 transition-all duration-200',
+              s.id === currentId
+                ? 'bg-brand-50 dark:bg-brand-500/10'
+                : 'hover:bg-slate-100 dark:hover:bg-slate-800',
             ]"
             style="border: none; padding: 10px 12px;"
             @click="selectSession(s.id)"
@@ -119,14 +118,16 @@ onMounted(() => {
                   <span
                     :class="[
                       'block truncate text-sm font-medium',
-                      s.id === currentId ? 'text-brand-700' : 'text-slate-700',
+                      s.id === currentId
+                        ? 'text-brand-700 dark:text-brand-300'
+                        : 'text-slate-700 dark:text-slate-200',
                     ]"
                   >
                     {{ s.title || '新会话' }}
                   </span>
                 </template>
                 <template #description>
-                  <span class="text-[11px] text-slate-400">
+                  <span class="text-[11px] text-slate-400 dark:text-slate-500">
                     {{ new Date(s.lastMessageAt).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) }}
                     {{ new Date(s.lastMessageAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) }}
                   </span>

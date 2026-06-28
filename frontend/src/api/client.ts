@@ -12,7 +12,7 @@ import type { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosErr
 const client: AxiosInstance = axios.create({
   baseURL: '/api',
   timeout: 30000,
-  headers: { 'Content-Type': 'application/json' },
+
 });
 
 /** 请求拦截：自动附加 JWT */

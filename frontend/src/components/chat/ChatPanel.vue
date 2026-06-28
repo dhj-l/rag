@@ -37,23 +37,23 @@ onMounted(() => scrollToBottom());
 </script>
 
 <template>
-  <div class="flex h-full flex-col bg-slate-50">
+  <div class="flex h-full flex-col bg-slate-50 dark:bg-slate-950">
     <!-- 无会话 -->
     <div
       v-if="!current"
       class="flex flex-1 flex-col items-center justify-center px-6 text-center"
     >
-      <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-50 text-brand-500">
+      <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-50 text-brand-500 dark:bg-brand-500/10 dark:text-brand-400">
         <MessageOutlined style="font-size: 28px;" />
       </div>
-      <p class="mt-4 text-base font-semibold text-slate-700">开始你的第一次对话</p>
-      <p class="mt-1.5 text-sm text-slate-400">从左侧选择或新建一个会话</p>
+      <p class="mt-4 text-base font-semibold text-slate-700 dark:text-slate-200">开始你的第一次对话</p>
+      <p class="mt-1.5 text-sm text-slate-400 dark:text-slate-500">从左侧选择或新建一个会话</p>
     </div>
 
     <template v-else>
       <!-- 标题栏 -->
-      <div class="flex h-12 shrink-0 items-center border-b border-slate-200 bg-white px-4">
-        <span class="truncate text-sm font-medium text-slate-700">{{ current.title }}</span>
+      <div class="flex h-12 shrink-0 items-center border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900">
+        <span class="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{{ current.title }}</span>
       </div>
 
       <!-- 消息区 -->
@@ -64,11 +64,11 @@ onMounted(() => scrollToBottom());
             v-if="!messages.length && !isStreaming"
             class="flex flex-col items-center justify-center py-20 text-center"
           >
-            <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-500">
+            <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-500 dark:bg-brand-500/10 dark:text-brand-400">
               <MessageOutlined style="font-size: 24px;" />
             </div>
-            <p class="mt-4 text-sm font-medium text-slate-600">输入消息开始与文档助手对话</p>
-            <p class="mt-1 text-xs text-slate-400">基于已上传文档检索作答，并给出引用来源</p>
+            <p class="mt-4 text-sm font-medium text-slate-600 dark:text-slate-300">输入消息开始与文档助手对话</p>
+            <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">基于已上传文档检索作答，并给出引用来源</p>
           </div>
 
           <MessageBubble v-for="m in messages" :key="m.id" :message="m" />
@@ -90,12 +90,12 @@ onMounted(() => scrollToBottom());
       <!-- 流式状态条 -->
       <div
         v-if="isStreaming"
-        class="flex items-center justify-between bg-white px-4 pb-2 text-xs text-slate-400"
+        class="flex items-center justify-between bg-white px-4 pb-2 text-xs text-slate-400 dark:bg-slate-900 dark:text-slate-500"
       >
         <span class="flex items-center gap-1.5">
           <span class="relative flex h-2 w-2">
-            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75"></span>
-            <span class="relative inline-flex h-2 w-2 rounded-full bg-brand-500"></span>
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-400 opacity-75"></span>
+            <span class="relative inline-flex h-2 w-2 rounded-full bg-accent-500"></span>
           </span>
           正在生成回复…
         </span>

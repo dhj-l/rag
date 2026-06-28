@@ -29,7 +29,7 @@ const showSources = ref(false);
       <!-- 用户消息 -->
       <div
         v-if="!isAssistant"
-        class="whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-brand-600 px-4 py-2.5 text-sm text-white shadow-soft"
+        class="whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-gradient-to-br from-brand-500 to-brand-600 px-4 py-2.5 text-sm text-white shadow-soft"
       >
         {{ message.content }}
       </div>
@@ -37,17 +37,17 @@ const showSources = ref(false);
       <!-- 助手消息 -->
       <div
         v-else
-        class="rounded-2xl rounded-bl-md bg-white px-4 py-3 shadow-soft ring-1 ring-slate-200/70"
+        class="rounded-2xl rounded-bl-md bg-white px-4 py-3 shadow-soft ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800"
       >
         <div v-if="message.content" class="prose-chat" v-html="renderedHtml"></div>
 
         <!-- 流式打字光标 + 工具提示 -->
-        <div v-if="streaming" class="mt-1 flex items-center gap-2 text-xs text-slate-400">
+        <div v-if="streaming" class="mt-1 flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
           <span v-if="toolHint">{{ toolHint }}</span>
           <span v-if="!message.content && !toolHint">思考中…</span>
           <span
             v-if="message.content"
-            class="inline-block h-4 w-0.5 animate-caret-blink bg-brand-500 align-middle"
+            class="inline-block h-4 w-0.5 animate-caret-blink bg-brand-500 align-middle dark:bg-brand-400"
           ></span>
         </div>
 

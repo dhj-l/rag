@@ -53,12 +53,12 @@ async function handleLogin(): Promise<void> {
     <div
       class="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-brand-700 via-brand-600 to-brand-800 p-12 text-white lg:flex"
     >
-      <!-- 装饰光斑 -->
+      <!-- 装饰光斑（极光感） -->
       <div
         class="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-3xl"
       ></div>
       <div
-        class="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-accent-400/25 blur-3xl"
+        class="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-sky-400/20 blur-3xl"
       ></div>
       <!-- 网格纹理 -->
       <div
@@ -98,7 +98,7 @@ async function handleLogin(): Promise<void> {
     </div>
 
     <!-- 右：登录表单 -->
-    <div class="flex flex-1 items-center justify-center bg-slate-50 p-6">
+    <div class="flex flex-1 items-center justify-center bg-slate-50 p-6 dark:bg-slate-950">
       <div class="w-full max-w-sm">
         <!-- 移动端 logo -->
         <div class="mb-8 flex items-center gap-2.5 lg:hidden">
@@ -107,61 +107,66 @@ async function handleLogin(): Promise<void> {
           >
             <ReadOutlined style="font-size: 20px;" />
           </div>
-          <span class="text-lg font-semibold text-slate-900">智能文档助手</span>
+          <span class="text-lg font-semibold text-slate-900 dark:text-slate-100">智能文档助手</span>
         </div>
 
-        <h2 class="text-2xl font-bold text-slate-900">欢迎回来</h2>
-        <p class="mt-1.5 text-sm text-slate-500">登录以继续使用文档助手</p>
-
-        <a-form
-          ref="formRef"
-          :model="form"
-          :rules="loginRules"
-          layout="vertical"
-          size="large"
-          class="mt-7"
+        <!-- 登录卡片（premium 浮卡） -->
+        <div
+          class="rounded-2xl border border-slate-200/70 bg-white p-7 shadow-card dark:border-slate-800 dark:bg-slate-900"
         >
-          <a-form-item name="username">
-            <a-input
-              v-model:value="form.username"
-              autocomplete="username"
-              placeholder="请输入用户名"
-            >
-              <template #prefix><UserOutlined class="text-slate-400" /></template>
-            </a-input>
-          </a-form-item>
+          <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">欢迎回来</h2>
+          <p class="mt-1.5 text-sm text-slate-500 dark:text-slate-400">登录以继续使用文档助手</p>
 
-          <a-form-item name="password">
-            <a-input-password
-              v-model:value="form.password"
-              autocomplete="current-password"
-              placeholder="请输入密码"
-            >
-              <template #prefix><LockOutlined class="text-slate-400" /></template>
-            </a-input-password>
-          </a-form-item>
+          <a-form
+            ref="formRef"
+            :model="form"
+            :rules="loginRules"
+            layout="vertical"
+            size="large"
+            class="mt-7"
+          >
+            <a-form-item name="username">
+              <a-input
+                v-model:value="form.username"
+                autocomplete="username"
+                placeholder="请输入用户名"
+              >
+                <template #prefix><UserOutlined class="text-slate-400" /></template>
+              </a-input>
+            </a-form-item>
 
-          <a-alert
-            v-if="error"
-            :message="error"
-            type="error"
-            show-icon
-            style="margin-bottom: 16px;"
-          />
+            <a-form-item name="password">
+              <a-input-password
+                v-model:value="form.password"
+                autocomplete="current-password"
+                placeholder="请输入密码"
+              >
+                <template #prefix><LockOutlined class="text-slate-400" /></template>
+              </a-input-password>
+            </a-form-item>
 
-          <a-form-item style="margin-bottom: 0;">
-            <a-button
-              type="primary"
-              html-type="submit"
-              :loading="loading"
-              block
-              size="large"
-              @click="handleLogin"
-            >
-              {{ loading ? '登录中…' : '登录' }}
-            </a-button>
-          </a-form-item>
-        </a-form>
+            <a-alert
+              v-if="error"
+              :message="error"
+              type="error"
+              show-icon
+              style="margin-bottom: 16px;"
+            />
+
+            <a-form-item style="margin-bottom: 0;">
+              <a-button
+                type="primary"
+                html-type="submit"
+                :loading="loading"
+                block
+                size="large"
+                @click="handleLogin"
+              >
+                {{ loading ? '登录中…' : '登录' }}
+              </a-button>
+            </a-form-item>
+          </a-form>
+        </div>
       </div>
     </div>
   </div>

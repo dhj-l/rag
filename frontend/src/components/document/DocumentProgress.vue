@@ -34,7 +34,7 @@ const tagColor = computed(() => {
   <div>
     <div v-if="status === 'failed'" class="flex items-center gap-2">
       <a-tag :color="tagColor">{{ meta.label }}</a-tag>
-      <span v-if="errorMessage" class="text-xs text-rose-600">{{ errorMessage }}</span>
+      <span v-if="errorMessage" class="text-xs text-rose-600 dark:text-rose-400">{{ errorMessage }}</span>
     </div>
 
     <div v-else class="flex items-center gap-2">

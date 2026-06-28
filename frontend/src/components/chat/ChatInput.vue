@@ -28,10 +28,10 @@ function onKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="border-t border-slate-200 bg-white px-4 pb-3 pt-3">
+  <div class="border-t border-slate-200 bg-white px-4 pb-3 pt-3 dark:border-slate-800 dark:bg-slate-900">
     <div class="mx-auto max-w-3xl">
       <div
-        class="rounded-2xl border border-slate-200 bg-white shadow-soft transition-all focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100"
+        class="rounded-2xl border border-slate-200 bg-white shadow-soft transition-all duration-200 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:focus-within:border-brand-500 dark:focus-within:ring-brand-500/20"
       >
         <a-textarea
           v-model:value="text"
@@ -43,7 +43,7 @@ function onKeydown(e: KeyboardEvent) {
           @keydown="onKeydown"
         />
         <div class="flex items-center justify-between px-2.5 pb-2">
-          <span class="text-[11px] text-slate-400">Enter 发送 · Shift+Enter 换行</span>
+          <span class="text-[11px] text-slate-400 dark:text-slate-500">Enter 发送 · Shift+Enter 换行</span>
           <a-button
             type="primary"
             shape="circle"

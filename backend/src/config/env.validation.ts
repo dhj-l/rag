@@ -24,9 +24,10 @@ export const validationSchema = Joi.object({
   DEEPSEEK_API_KEY: Joi.string().allow('').optional(),
   LLM_MODEL: Joi.string().default('deepseek-chat'),
 
-  // Embedding（T03 接入）
-  DASHSCOPE_API_KEY: Joi.string().allow('').optional(),
-  EMBEDDING_MODEL: Joi.string().default('text-embedding-v3'),
+  // Embedding（硅基流动 SiliconFlow）
+  SILICONFLOW_API_KEY: Joi.string().allow('').optional(),
+  SILICONFLOW_BASE_URL: Joi.string().uri().default('https://api.siliconflow.cn/v1'),
+  EMBEDDING_MODEL: Joi.string().default('Qwen/Qwen3-Embedding-0.6B'),
 
   // JWT
   JWT_SECRET: Joi.string().min(16).empty('').default('change-me-in-production--change-me'),
