@@ -41,8 +41,10 @@ export class RagSearchTool {
         }
 
         try {
-          // 1. 构建权限过滤条件
-          const filter = self.permissionService.buildVectorFilter(ctx);
+          // 1. 构建权限过滤条件（含 F-15 会话关联文档限定）
+          // context 由 AgentService 注入 { role, departments, userId, documentIds }
+          const documentIds = (config?.context as { documentIds?: string[] } | undefined)?.documentIds;
+          const filter = self.permissionService.buildVectorFilter(ctx, documentIds);
 
           // 2. 向量检索
           const results: SearchResult[] = await self.vectorStoreService.similaritySearch(input.query, filter, 5);

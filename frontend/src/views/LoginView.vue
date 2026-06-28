@@ -1,25 +1,42 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { reactive, ref, markRaw } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { loginRules } from '@/config/form-rules';
+import type { FormInstance } from 'ant-design-vue';
+import {
+  ReadOutlined,
+  UserOutlined,
+  LockOutlined,
+  SearchOutlined,
+  SafetyOutlined,
+  MessageOutlined,
+} from '@ant-design/icons-vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
 
 const loading = ref(false);
 const error = ref('');
+const formRef = ref<FormInstance>();
 
-const form = ref({ username: '', password: '' });
+const form = reactive({ username: '', password: '' });
+
+// 品牌区特性
+const features = [
+  { icon: markRaw(SearchOutlined), text: '向量检索，精准定位文档相关段落' },
+  { icon: markRaw(SafetyOutlined), text: '按保密级别与部门精细管控知识' },
+  { icon: markRaw(MessageOutlined), text: '流式对话，实时展示引用来源' },
+];
 
 async function handleLogin(): Promise<void> {
-  if (!form.value.username || !form.value.password) {
-    error.value = '请输入用户名和密码';
-    return;
-  }
+  const valid = await formRef.value?.validate().catch(() => false);
+  if (!valid) return;
+
   loading.value = true;
   error.value = '';
   try {
-    await authStore.login(form.value.username, form.value.password);
+    await authStore.login(form.username, form.password);
     router.push('/');
   } catch (err: unknown) {
     const e = err as { message?: string };
@@ -31,43 +48,121 @@ async function handleLogin(): Promise<void> {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-200">
-    <div class="w-full max-w-sm bg-white rounded-lg shadow-md p-8">
-      <h1 class="text-2xl font-bold text-center text-slate-800 mb-6">智能文档助手</h1>
+  <div class="flex min-h-screen">
+    <!-- 左：品牌展示区 -->
+    <div
+      class="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-brand-700 via-brand-600 to-brand-800 p-12 text-white lg:flex"
+    >
+      <!-- 装饰光斑 -->
+      <div
+        class="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-3xl"
+      ></div>
+      <div
+        class="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-accent-400/25 blur-3xl"
+      ></div>
+      <!-- 网格纹理 -->
+      <div
+        class="pointer-events-none absolute inset-0 opacity-[0.08]"
+        style="background-image: linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px); background-size: 40px 40px;"
+      ></div>
 
-      <form @submit.prevent="handleLogin" class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">用户名</label>
-          <input
-            v-model="form.username"
-            type="text"
-            autocomplete="username"
-            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
-            placeholder="请输入用户名"
-          />
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">密码</label>
-          <input
-            v-model="form.password"
-            type="password"
-            autocomplete="current-password"
-            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
-            placeholder="请输入密码"
-          />
-        </div>
-
-        <p v-if="error" class="text-red-500 text-sm">{{ error }}</p>
-
-        <button
-          type="submit"
-          :disabled="loading"
-          class="w-full py-2 px-4 bg-brand text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 disabled:opacity-50 transition-colors"
+      <!-- logo -->
+      <div class="relative flex items-center gap-3">
+        <div
+          class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 backdrop-blur"
         >
-          {{ loading ? '登录中...' : '登录' }}
-        </button>
-      </form>
+          <ReadOutlined style="font-size: 22px;" />
+        </div>
+        <span class="text-lg font-semibold">智能文档助手</span>
+      </div>
+
+      <!-- 标语 + 特性 -->
+      <div class="relative">
+        <h1 class="text-4xl font-bold leading-tight">让企业知识<br />可对话、可检索</h1>
+        <p class="mt-4 max-w-md text-brand-100">
+          基于 RAG 的智能文档助手，上传资料后即可用自然语言提问，AI 精准定位段落并给出引用来源。
+        </p>
+        <ul class="mt-8 space-y-3">
+          <li v-for="f in features" :key="f.text" class="flex items-center gap-3">
+            <span
+              class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/15 backdrop-blur"
+            >
+              <component :is="f.icon" />
+            </span>
+            <span class="text-sm text-brand-50">{{ f.text }}</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="relative text-xs text-brand-200">© 智能文档助手 · 企业知识库</div>
+    </div>
+
+    <!-- 右：登录表单 -->
+    <div class="flex flex-1 items-center justify-center bg-slate-50 p-6">
+      <div class="w-full max-w-sm">
+        <!-- 移动端 logo -->
+        <div class="mb-8 flex items-center gap-2.5 lg:hidden">
+          <div
+            class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-soft"
+          >
+            <ReadOutlined style="font-size: 20px;" />
+          </div>
+          <span class="text-lg font-semibold text-slate-900">智能文档助手</span>
+        </div>
+
+        <h2 class="text-2xl font-bold text-slate-900">欢迎回来</h2>
+        <p class="mt-1.5 text-sm text-slate-500">登录以继续使用文档助手</p>
+
+        <a-form
+          ref="formRef"
+          :model="form"
+          :rules="loginRules"
+          layout="vertical"
+          size="large"
+          class="mt-7"
+        >
+          <a-form-item name="username">
+            <a-input
+              v-model:value="form.username"
+              autocomplete="username"
+              placeholder="请输入用户名"
+            >
+              <template #prefix><UserOutlined class="text-slate-400" /></template>
+            </a-input>
+          </a-form-item>
+
+          <a-form-item name="password">
+            <a-input-password
+              v-model:value="form.password"
+              autocomplete="current-password"
+              placeholder="请输入密码"
+            >
+              <template #prefix><LockOutlined class="text-slate-400" /></template>
+            </a-input-password>
+          </a-form-item>
+
+          <a-alert
+            v-if="error"
+            :message="error"
+            type="error"
+            show-icon
+            style="margin-bottom: 16px;"
+          />
+
+          <a-form-item style="margin-bottom: 0;">
+            <a-button
+              type="primary"
+              html-type="submit"
+              :loading="loading"
+              block
+              size="large"
+              @click="handleLogin"
+            >
+              {{ loading ? '登录中…' : '登录' }}
+            </a-button>
+          </a-form-item>
+        </a-form>
+      </div>
     </div>
   </div>
 </template>

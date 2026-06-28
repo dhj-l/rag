@@ -50,6 +50,8 @@ export class AgentService implements OnModuleInit {
       role: z.enum(['employee', 'manager', 'ceo', 'admin']),
       departments: z.array(z.string()),
       userId: z.string(),
+      // F-15 会话关联文档：限定 Agent 检索范围到这些文档；空数组表示不限定
+      documentIds: z.array(z.string()),
     });
 
     const callbacks = [];
@@ -91,6 +93,8 @@ export class AgentService implements OnModuleInit {
    * @param query 用户当前输入
    * @param user 权限上下文
    * @param history 多轮历史（§7.6，由 ChatService 从 MongoDB 加载最近 10 条）
+   * @param documentIds F-15 会话关联文档 ID 列表，传入后 rag_search 工具
+   *   会在权限过滤基础上额外限定检索到这些文档（多文档问答）；默认空数组不限定
    * @returns AsyncGenerator<SSEEvent>
    *
    * 说明：T03 createAgent 未配置 checkpointer，thread_id 不持久化；
@@ -101,6 +105,7 @@ export class AgentService implements OnModuleInit {
     query: string,
     user: UserContext,
     history: BaseMessage[] = [],
+    documentIds: string[] = [],
   ): AsyncGenerator<SSEEvent> {
     const input = {
       messages: [...history, new HumanMessage(query)],
@@ -112,6 +117,7 @@ export class AgentService implements OnModuleInit {
         role: user.role,
         departments: user.departments,
         userId: user.userId,
+        documentIds, // F-15 透传给 rag_search 工具
       },
     };
 

@@ -58,3 +58,27 @@ export class UpdateDocumentSecurityDto {
   @IsNotEmpty({ message: 'L2/L3 级别文档必须指定所属部门' })
   department?: string;
 }
+
+/**
+ * 段落级摘要请求 DTO（F-13，POST /api/documents/:id/summary）
+ *
+ * 通过页码范围指定要生成摘要的段落区间（1-based，闭区间），
+ * 实现"可选择目标段落生成局部摘要"（PRD US-6 / F-13 验收标准）。
+ * 仅对 PDF 有效（其他格式无页码概念，将退化为全文摘要）。
+ * startPage / endPage 均可选：都不传 → 全文；只传 startPage → 从该页到末页。
+ */
+export class SummarizeRangeDto {
+  /** 起始页码（1-based），可选；不传默认从第 1 页 */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'startPage 必须为整数' })
+  @Min(1, { message: 'startPage 最小为 1' })
+  startPage?: number;
+
+  /** 结束页码（1-based），可选；不传默认到最后一页 */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'endPage 必须为整数' })
+  @Min(1, { message: 'endPage 最小为 1' })
+  endPage?: number;
+}

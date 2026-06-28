@@ -6,7 +6,9 @@
   "type": "module",
   "packageManager": "pnpm@10.2.0",
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "scripts": {
     "dev": "vite",
@@ -15,8 +17,10 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@ant-design/icons-vue": "^7.0.1",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@vueuse/core": "^10.7.0",
+    "ant-design-vue": "^4",
     "axios": "^1.6.0",
     "highlight.js": "^11.9.0",
     "markdown-it": "^14.0.0",

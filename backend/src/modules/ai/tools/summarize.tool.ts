@@ -3,20 +3,21 @@ import { tool } from 'langchain';
 import * as z from 'zod';
 import { PermissionService } from '../permission.service';
 import { LlmService } from '../llm.service';
-import { SystemMessage } from '@langchain/core/messages';
-import { SummarizeOutput, UserContext } from '../../../common/types/common.types';
+import { DocumentProcessorService } from '../document-processor.service';
+import { SummarizeOutput, UserContext, FileType } from '../../../common/types/common.types';
 import { InjectConnection } from '@nestjs/mongoose';
-import { Connection } from 'mongoose';
+import { Connection, Types } from 'mongoose';
 
 /**
  * 文档摘要工具（ARCHITECTURE.md §3.5 summarize_document、§5.3 T03 实现要点 9）
  *
  * 执行流程：
  * 1. 从 config.context 获取权限上下文
- * 2. 从 MongoDB 查询文档信息
+ * 2. 从 MongoDB 查询文档信息（raw collection）
  * 3. 调 PermissionService.canAccessDocument 校验权限
  * 4. 无权限返回提示
- * 5. 有权限读文件内容，调 LlmService 生成摘要
+ * 5. 有权限读文件内容（F-07：复用 DocumentProcessorService.extractText 正确解析 PDF），
+ *    调 LlmService 生成摘要
  * 6. 返回 { summary, documentTitle }
  */
 @Injectable()
@@ -26,6 +27,8 @@ export class SummarizeTool {
   constructor(
     private readonly permissionService: PermissionService,
     private readonly llmService: LlmService,
+    // F-07：注入 DocumentProcessorService 以复用统一文件解析（避免直接 readFileSync PDF 乱码）
+    private readonly documentProcessorService: DocumentProcessorService,
     @InjectConnection() private readonly connection: Connection,
   ) {}
 
@@ -42,10 +45,10 @@ export class SummarizeTool {
         }
 
         try {
-          // 1. 查询文档信息
+          // 1. 查询文档信息（raw collection 'documents'，字段名与 §3.2 schema 保持一致）
           const doc = await self.connection
             .collection('documents')
-            .findOne({ _id: new (require('mongoose').Types.ObjectId)(input.documentId) });
+            .findOne({ _id: new Types.ObjectId(input.documentId) });
 
           if (!doc) {
             return JSON.stringify({
@@ -74,11 +77,30 @@ export class SummarizeTool {
           }
 
           // 3. 读文件内容
-          const fs = require('fs');
+          //    F-07 修复：复用 DocumentProcessorService.extractText，PDF 走 pdf-parse 正确解析，
+          //    替代早期 require('fs') + readFileSync(utf-8) 读 PDF 二进制导致的乱码。
+          if (!doc.filePath) {
+            return JSON.stringify({
+              summary: '文档文件不可用。',
+              documentTitle: doc.title,
+            } as SummarizeOutput);
+          }
+
           let fileContent = '';
-          if (doc.filePath && fs.existsSync(doc.filePath)) {
-            fileContent = fs.readFileSync(doc.filePath, 'utf-8').slice(0, 8000); // 取前 8000 字符
-          } else {
+          try {
+            const content = await self.documentProcessorService.extractText(
+              doc.filePath,
+              doc.fileType as FileType,
+            );
+            fileContent = content.text.slice(0, 8000); // 取前 8000 字符控制 token 用量
+          } catch (err) {
+            self.logger.error(`文档解析失败 (docId=${input.documentId})：${err}`);
+            return JSON.stringify({
+              summary: '文档解析失败，请稍后重试。',
+              documentTitle: doc.title,
+            } as SummarizeOutput);
+          }
+          if (!fileContent) {
             return JSON.stringify({
               summary: '文档文件不可用。',
               documentTitle: doc.title,

@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue';
 import { useSessionStore } from '@/stores/session';
 import { useChat } from '@/composables/useChat';
+import { MessageOutlined } from '@ant-design/icons-vue';
 import MessageBubble from './MessageBubble.vue';
 import ChatInput from './ChatInput.vue';
 
@@ -27,7 +28,6 @@ async function scrollToBottom() {
   }
 }
 
-// 消息变化或流式内容更新时滚动到底
 watch(
   () => [messages.value.length, streamingMessage.value?.content, currentToolHint.value],
   () => scrollToBottom(),
@@ -38,48 +38,68 @@ onMounted(() => scrollToBottom());
 
 <template>
   <div class="flex h-full flex-col bg-slate-50">
-    <!-- 空状态 -->
-    <div v-if="!current" class="flex flex-1 items-center justify-center text-sm text-slate-400">
-      请从左侧选择或新建一个会话开始对话
+    <!-- 无会话 -->
+    <div
+      v-if="!current"
+      class="flex flex-1 flex-col items-center justify-center px-6 text-center"
+    >
+      <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-50 text-brand-500">
+        <MessageOutlined style="font-size: 28px;" />
+      </div>
+      <p class="mt-4 text-base font-semibold text-slate-700">开始你的第一次对话</p>
+      <p class="mt-1.5 text-sm text-slate-400">从左侧选择或新建一个会话</p>
     </div>
 
     <template v-else>
-      <!-- 会话标题栏 -->
+      <!-- 标题栏 -->
       <div class="flex h-12 shrink-0 items-center border-b border-slate-200 bg-white px-4">
         <span class="truncate text-sm font-medium text-slate-700">{{ current.title }}</span>
       </div>
 
-      <!-- 消息流 -->
-      <div ref="scrollRef" class="scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <div v-if="!messages.length && !isStreaming" class="flex h-full items-center justify-center text-sm text-slate-400">
-          输入消息开始与文档助手对话
-        </div>
+      <!-- 消息区 -->
+      <div ref="scrollRef" class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-6">
+        <div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
+          <!-- 空消息 -->
+          <div
+            v-if="!messages.length && !isStreaming"
+            class="flex flex-col items-center justify-center py-20 text-center"
+          >
+            <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-500">
+              <MessageOutlined style="font-size: 24px;" />
+            </div>
+            <p class="mt-4 text-sm font-medium text-slate-600">输入消息开始与文档助手对话</p>
+            <p class="mt-1 text-xs text-slate-400">基于已上传文档检索作答，并给出引用来源</p>
+          </div>
 
-        <MessageBubble
-          v-for="m in messages"
-          :key="m.id"
-          :message="m"
-        />
+          <MessageBubble v-for="m in messages" :key="m.id" :message="m" />
 
-        <!-- 流式生成中的助手占位消息 -->
-        <MessageBubble
-          v-if="streamingMessage"
-          :message="streamingMessage"
-          :streaming="true"
-          :tool-hint="currentToolHint"
-        />
+          <MessageBubble
+            v-if="streamingMessage"
+            :message="streamingMessage"
+            :streaming="true"
+            :tool-hint="currentToolHint"
+          />
 
-        <!-- 错误提示 -->
-        <div v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
-          ⚠️ {{ error }}
+          <a-alert v-if="error" :message="error" type="error" show-icon />
         </div>
       </div>
 
       <!-- 输入区 -->
       <ChatInput :disabled="isStreaming" @send="send" />
-      <div v-if="isStreaming" class="flex items-center justify-between bg-white px-3 pb-2 text-xs text-slate-400">
-        <span>正在生成回复…</span>
-        <button class="text-red-500 hover:underline" @click="abort">停止</button>
+
+      <!-- 流式状态条 -->
+      <div
+        v-if="isStreaming"
+        class="flex items-center justify-between bg-white px-4 pb-2 text-xs text-slate-400"
+      >
+        <span class="flex items-center gap-1.5">
+          <span class="relative flex h-2 w-2">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75"></span>
+            <span class="relative inline-flex h-2 w-2 rounded-full bg-brand-500"></span>
+          </span>
+          正在生成回复…
+        </span>
+        <a-button type="link" size="small" danger @click="abort">停止</a-button>
       </div>
     </template>
   </div>

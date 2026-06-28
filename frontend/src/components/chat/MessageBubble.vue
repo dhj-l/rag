@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue';
+import { computed, ref } from 'vue';
 import type { Message } from '@/types';
 import { useMarkdown } from '@/composables/useMarkdown';
 import SourceReferences from './SourceReferences.vue';
@@ -21,29 +21,24 @@ const renderedHtml = computed(() => {
 });
 
 const showSources = ref(false);
-
-// 滚动容器引用由父级管理；此处仅负责渲染
-watch(
-  () => props.message.content,
-  () => {
-    // 内容变化时由父级触发滚动
-  },
-);
 </script>
 
 <template>
-  <div class="flex" :class="isAssistant ? 'justify-start' : 'justify-end'">
+  <div class="flex animate-slide-in" :class="isAssistant ? 'justify-start' : 'justify-end'">
     <div class="max-w-[80%]">
       <!-- 用户消息 -->
       <div
         v-if="!isAssistant"
-        class="whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-brand-600 px-4 py-2.5 text-sm text-white"
+        class="whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-brand-600 px-4 py-2.5 text-sm text-white shadow-soft"
       >
         {{ message.content }}
       </div>
 
       <!-- 助手消息 -->
-      <div v-else class="rounded-2xl rounded-bl-sm bg-white px-4 py-3 shadow-sm ring-1 ring-slate-100">
+      <div
+        v-else
+        class="rounded-2xl rounded-bl-md bg-white px-4 py-3 shadow-soft ring-1 ring-slate-200/70"
+      >
         <div v-if="message.content" class="prose-chat" v-html="renderedHtml"></div>
 
         <!-- 流式打字光标 + 工具提示 -->

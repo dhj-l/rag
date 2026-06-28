@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { reactive, ref, computed } from 'vue';
 import { useDocumentStore } from '@/stores/document';
 import { DEPARTMENTS, SECURITY_LEVEL_OPTIONS } from '@/constants';
 import { SecurityLevel } from '@/types';
+import { uploadRules, departmentValidator } from '@/config/form-rules';
+import { InboxOutlined, CloudUploadOutlined, UploadOutlined } from '@ant-design/icons-vue';
+import { message } from 'ant-design-vue';
+import type { FormInstance, UploadChangeParam } from 'ant-design-vue';
 
 const props = defineProps<{
-  /** 管理后台上传后是否在 ChatView 右栏也展示 */
   compact?: boolean;
 }>();
 
@@ -14,155 +17,133 @@ const emit = defineEmits<{
 }>();
 
 const documentStore = useDocumentStore();
+const formRef = ref<FormInstance>();
+
+const form = reactive({
+  title: '',
+  securityLevel: SecurityLevel.L1 as SecurityLevel,
+  department: '',
+});
 
 const file = ref<File | null>(null);
-const title = ref('');
-const securityLevel = ref<SecurityLevel>(SecurityLevel.L1);
-const department = ref('');
-const dragOver = ref(false);
 const uploading = computed(() => documentStore.uploading);
-const errorMsg = ref('');
 
 const needDepartment = computed(
-  () => securityLevel.value === SecurityLevel.L2 || securityLevel.value === SecurityLevel.L3,
+  () => form.securityLevel === SecurityLevel.L2 || form.securityLevel === SecurityLevel.L3,
 );
+
+const deptRules = computed(() => departmentValidator(form.securityLevel));
 
 const ALLOWED_EXT = ['.pdf', '.txt', '.md', '.markdown'];
 
-function pickFile(f: File | null | undefined) {
-  errorMsg.value = '';
-  if (!f) return;
+function beforeUpload(f: File) {
   const ext = '.' + (f.name.split('.').pop() ?? '').toLowerCase();
   if (!ALLOWED_EXT.includes(ext)) {
-    errorMsg.value = '仅支持 pdf/txt/md/markdown 文件';
-    return;
+    message.error('仅支持 pdf/txt/md/markdown 文件');
+    return false;
   }
   if (f.size > 20 * 1024 * 1024) {
-    errorMsg.value = '文件大小不能超过 20MB';
-    return;
+    message.error('文件大小不能超过 20MB');
+    return false;
   }
   file.value = f;
-  if (!title.value) title.value = f.name.replace(/\.[^.]+$/, '');
+  if (!form.title) form.title = f.name.replace(/\.[^.]+$/, '');
+  return false;
 }
 
-function onDrop(e: DragEvent) {
-  dragOver.value = false;
-  pickFile(e.dataTransfer?.files?.[0]);
-}
-
-function onFileChange(e: Event) {
-  const input = e.target as HTMLInputElement;
-  pickFile(input.files?.[0]);
+function handleChange(info: UploadChangeParam) {
+  if (info.fileList.length === 1 && !file.value) {
+    beforeUpload(info.file as unknown as File);
+  }
 }
 
 async function submit() {
+  const valid = await formRef.value?.validate().catch(() => false);
+  if (!valid) return;
+
   if (!file.value) {
-    errorMsg.value = '请选择文件';
-    return;
-  }
-  if (!title.value.trim()) {
-    errorMsg.value = '请填写文档标题';
-    return;
-  }
-  if (needDepartment.value && !department.value) {
-    errorMsg.value = '请选择所属部门';
+    message.error('请选择文件');
     return;
   }
 
-  errorMsg.value = '';
   try {
     const id = await documentStore.upload({
       file: file.value,
-      title: title.value.trim(),
-      securityLevel: securityLevel.value,
-      department: needDepartment.value ? department.value : undefined,
+      title: form.title.trim(),
+      securityLevel: form.securityLevel,
+      department: needDepartment.value ? form.department : undefined,
     });
     emit('uploaded', id);
-    // 重置表单
     file.value = null;
-    title.value = '';
-    securityLevel.value = SecurityLevel.L1;
-    department.value = '';
-    // 后台轮询状态
+    form.title = '';
+    form.securityLevel = SecurityLevel.L1;
+    form.department = '';
+    formRef.value?.resetFields();
     void documentStore.pollStatus(id);
   } catch (err) {
-    errorMsg.value = (err as { message?: string })?.message ?? '上传失败';
+    message.error((err as { message?: string })?.message ?? '上传失败');
   }
 }
 </script>
 
 <template>
-  <div :class="compact ? '' : 'rounded-lg border border-slate-200 bg-white p-4'">
-    <div v-if="!compact" class="mb-3 text-sm font-semibold text-slate-700">上传文档</div>
-
-    <!-- 拖拽区 -->
+  <div :class="compact ? '' : 'rounded-lg border border-slate-200 bg-white p-4 shadow-soft'">
     <div
-      class="mb-3 rounded-lg border-2 border-dashed p-4 text-center transition-colors"
-      :class="dragOver ? 'border-brand-400 bg-brand-50' : 'border-slate-300'"
-      @dragover.prevent="dragOver = true"
-      @dragleave.prevent="dragOver = false"
-      @drop.prevent="onDrop"
+      v-if="!compact"
+      class="mb-3 flex items-center gap-1.5 text-sm font-semibold text-slate-700"
     >
-      <input
-        id="doc-upload-file"
-        type="file"
-        accept=".pdf,.txt,.md,.markdown"
-        class="hidden"
-        @change="onFileChange"
-      />
-      <label
-        for="doc-upload-file"
-        class="block cursor-pointer text-xs text-slate-500"
-      >
-        <div class="mb-1 text-2xl">📄</div>
-        <div v-if="file" class="text-brand-600">{{ file.name }}（{{ (file.size / 1024).toFixed(1) }} KB）</div>
-        <div v-else>点击或拖拽文件到此处上传<br />支持 PDF / TXT / Markdown（≤20MB）</div>
-        <span class="mt-1 inline-block rounded bg-slate-100 px-2 py-1 text-[11px] text-slate-600">选择文件</span>
-      </label>
+      <CloudUploadOutlined class="text-slate-400" />
+      上传文档
     </div>
 
-    <div class="space-y-2.5">
-      <div>
-        <label class="mb-1 block text-xs text-slate-600">文档标题</label>
-        <input
-          v-model="title"
-          class="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-          placeholder="请输入文档标题"
-        />
-      </div>
-
-      <div>
-        <label class="mb-1 block text-xs text-slate-600">保密级别</label>
-        <select
-          v-model="securityLevel"
-          class="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+    <a-form
+      ref="formRef"
+      :model="form"
+      :rules="uploadRules"
+      layout="vertical"
+      size="large"
+    >
+      <!-- 拖拽上传区域 -->
+      <a-form-item style="margin-bottom: 16px;">
+        <a-upload-dragger
+          :max-count="1"
+          :file-list="file ? [{ uid: '-1', name: file.name, size: file.size } as any] : []"
+          :before-upload="beforeUpload"
+          :show-upload-list="{ showPreviewIcon: false, showRemoveIcon: true, showDownloadIcon: false }"
+          accept=".pdf,.txt,.md,.markdown"
+          @change="handleChange"
+          @remove="file = null"
         >
-          <option v-for="opt in SECURITY_LEVEL_OPTIONS" :key="opt.value" :value="opt.value">
+          <p class="ant-upload-drag-icon mb-2">
+            <InboxOutlined class="text-brand-500" style="font-size: 36px;" />
+          </p>
+          <p class="ant-upload-text text-[13px] font-medium text-slate-600">点击或拖拽文件到此处上传</p>
+          <p class="ant-upload-hint mt-1 text-xs text-slate-400">支持 PDF / TXT / Markdown（≤20MB）</p>
+        </a-upload-dragger>
+      </a-form-item>
+
+      <a-form-item name="title" label="文档标题">
+        <a-input v-model:value="form.title" placeholder="请输入文档标题" />
+      </a-form-item>
+
+      <a-form-item name="securityLevel" label="保密级别">
+        <a-select v-model:value="form.securityLevel">
+          <a-select-option v-for="opt in SECURITY_LEVEL_OPTIONS" :key="opt.value" :value="opt.value">
             {{ opt.label }}（{{ opt.hint }}）
-          </option>
-        </select>
-      </div>
+          </a-select-option>
+        </a-select>
+      </a-form-item>
 
-      <div v-if="needDepartment">
-        <label class="mb-1 block text-xs text-slate-600">所属部门</label>
-        <select
-          v-model="department"
-          class="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-        >
-          <option value="">请选择部门</option>
-          <option v-for="d in DEPARTMENTS" :key="d" :value="d">{{ d }}</option>
-        </select>
-      </div>
-    </div>
+      <a-form-item v-if="needDepartment" name="department" label="所属部门" :rules="deptRules">
+        <a-select v-model:value="form.department" placeholder="请选择部门" allow-clear>
+          <a-select-option v-for="d in DEPARTMENTS" :key="d" :value="d">{{ d }}</a-select-option>
+        </a-select>
+      </a-form-item>
+    </a-form>
 
-    <div v-if="errorMsg" class="mt-2 text-xs text-red-500">{{ errorMsg }}</div>
-
-    <button
-      :disabled="uploading"
-      class="mt-3 w-full rounded-md bg-brand py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-      @click="submit"
-    >
+    <a-button type="primary" :loading="uploading" block size="large" @click="submit">
+      <template #icon><UploadOutlined /></template>
       {{ uploading ? '上传中…' : '上传' }}
-    </button>
+    </a-button>
   </div>
 </template>

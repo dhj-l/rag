@@ -12,6 +12,7 @@ import {
   UserContext,
 } from '../../common/types/common.types';
 import { AgentService } from '../ai/agent.service';
+import { LlmService } from '../ai/llm.service';
 import { AuditService } from '../audit/audit.service';
 import { Message, MessageDocument } from './message.schema';
 import { Session, SessionDocument } from '../session/session.schema';
@@ -39,6 +40,7 @@ export class ChatService {
     @InjectModel(Message.name) private readonly messageModel: Model<MessageDocument>,
     private readonly agentService: AgentService,
     private readonly auditService: AuditService,
+    private readonly llmService: LlmService,
   ) {}
 
   async *streamMessage(
@@ -67,12 +69,14 @@ export class ChatService {
     });
 
     // 4. 流式调用 Agent，边转发边累积
+    // F-15：取出会话关联文档，透传给 Agent 限定检索范围（多文档问答）
+    const documentIds = (session.documentIds ?? []).map((d) => String(d));
     let fullContent = '';
     const sources: SourceReference[] = [];
     let toolUsed = '';
 
     try {
-      for await (const evt of this.agentService.streamChat(sessionId, message, user, history)) {
+      for await (const evt of this.agentService.streamChat(sessionId, message, user, history, documentIds)) {
         if (evt.type === SSEEventType.TOKEN && evt.content) {
           fullContent += evt.content;
         } else if (evt.type === SSEEventType.SOURCES && evt.data) {
@@ -129,6 +133,8 @@ export class ChatService {
           securityLevel: String(s.securityLevel),
         })),
         toolUsed: toolUsed || undefined,
+        // F-11：token 用量估算（精确值由 Langfuse 记录，此处为 message 层粗估）
+        tokenCount: this.llmService.estimateTokens(fullContent),
       });
     }
 

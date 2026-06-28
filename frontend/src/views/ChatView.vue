@@ -39,17 +39,17 @@ watch(
 <template>
   <div class="flex h-full">
     <!-- 左栏：会话列表 -->
-    <aside class="w-[280px] shrink-0 border-r border-slate-200">
+    <aside class="flex w-[280px] shrink-0 flex-col border-r border-slate-200 bg-white">
       <SessionList />
     </aside>
 
     <!-- 中栏：对话区 -->
-    <section class="min-w-0 flex-1">
+    <section class="min-w-0 flex-1 bg-slate-50">
       <ChatPanel />
     </section>
 
     <!-- 右栏：文档区 -->
-    <aside class="w-[320px] shrink-0 border-l border-slate-200 bg-slate-50">
+    <aside class="flex w-[320px] shrink-0 flex-col border-l border-slate-200 bg-slate-50">
       <DocumentList />
     </aside>
   </div>

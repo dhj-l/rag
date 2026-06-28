@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import {
   listUsers,
   createUser,
@@ -9,28 +9,31 @@ import {
 } from '@/api/user';
 import { DEPARTMENTS, ROLE_LABELS } from '@/constants';
 import { Role, UserStatus } from '@/types';
+import { createUserRules, departmentOptions } from '@/config/form-rules';
+import { userTableColumns } from '@/config/table-columns';
 import DocumentUpload from '@/components/document/DocumentUpload.vue';
 import DocumentList from '@/components/document/DocumentList.vue';
+import { PlusOutlined } from '@ant-design/icons-vue';
+import type { FormInstance } from 'ant-design-vue';
+import { message } from 'ant-design-vue';
 
-/**
- * 管理后台（§5.3 T05 要点7）
- * Tab：用户管理（创建/分配角色部门/启停）+ 文档管理（上传/删除/调整保密级别）
- */
 type Tab = 'users' | 'documents';
-const tab = ref<Tab>('users');
+const activeTab = ref<Tab>('users');
 
 // ===== 用户管理 =====
 const users = ref<UserResponse[]>([]);
 const usersLoading = ref(false);
 const showCreate = ref(false);
-const createForm = ref({
+const createFormRef = ref<FormInstance>();
+const createForm = reactive({
   username: '',
   password: '',
   displayName: '',
   role: Role.EMPLOYEE,
   departments: [] as string[],
 });
-const createError = ref('');
+
+const roleOptions = Object.entries(ROLE_LABELS).map(([value, label]) => ({ label, value }));
 
 async function fetchUsers() {
   usersLoading.value = true;
@@ -42,62 +45,80 @@ async function fetchUsers() {
   }
 }
 
-function toggleDept(dept: string) {
-  const idx = createForm.value.departments.indexOf(dept);
-  if (idx >= 0) createForm.value.departments.splice(idx, 1);
-  else createForm.value.departments.push(dept);
-}
-
 async function submitCreate() {
-  createError.value = '';
-  if (!createForm.value.username || !createForm.value.password || !createForm.value.displayName) {
-    createError.value = '请填写完整信息';
-    return;
-  }
-  if (createForm.value.password.length < 6) {
-    createError.value = '密码长度不能少于 6 位';
-    return;
-  }
+  const valid = await createFormRef.value?.validate().catch(() => false);
+  if (!valid) return;
   try {
     await createUser({
-      username: createForm.value.username,
-      password: createForm.value.password,
-      displayName: createForm.value.displayName,
-      role: createForm.value.role,
-      departments: createForm.value.departments,
+      username: createForm.username,
+      password: createForm.password,
+      displayName: createForm.displayName,
+      role: createForm.role,
+      departments: createForm.departments,
     });
     showCreate.value = false;
-    createForm.value = { username: '', password: '', displayName: '', role: Role.EMPLOYEE, departments: [] };
+    createForm.username = '';
+    createForm.password = '';
+    createForm.displayName = '';
+    createForm.role = Role.EMPLOYEE;
+    createForm.departments = [];
+    createFormRef.value?.resetFields();
     await fetchUsers();
+    message.success('用户创建成功');
   } catch (err) {
-    createError.value = (err as { message?: string })?.message ?? '创建失败';
+    message.error((err as { message?: string })?.message ?? '创建失败');
   }
 }
 
-async function changeRole(u: UserResponse) {
-  const roles = Object.keys(ROLE_LABELS);
-  const newRole = prompt(`选择角色：\n${roles.map((r) => `${r} - ${ROLE_LABELS[r]}`).join('\n')}`, u.role) as Role | null;
-  if (!newRole || !ROLE_LABELS[newRole]) return;
+// 角色修改弹窗
+const roleModal = reactive({
+  visible: false,
+  userId: '',
+  username: '',
+  role: Role.EMPLOYEE as string,
+});
+
+function openRoleModal(u: UserResponse) {
+  roleModal.userId = u.id;
+  roleModal.username = u.username;
+  roleModal.role = u.role;
+  roleModal.visible = true;
+}
+
+async function confirmRoleChange() {
   try {
-    await updateUser(u.id, { role: newRole });
+    await updateUser(roleModal.userId, { role: roleModal.role as Role });
+    roleModal.visible = false;
     await fetchUsers();
+    message.success('角色已更新');
   } catch (err) {
-    alert((err as { message?: string })?.message ?? '修改失败');
+    message.error((err as { message?: string })?.message ?? '修改失败');
   }
 }
 
-async function changeDepts(u: UserResponse) {
-  const input = prompt(
-    `请输入部门（用逗号分隔，可选：${DEPARTMENTS.join('/')}）`,
-    u.departments.join(','),
-  );
-  if (input === null) return;
-  const depts = input.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+// 部门修改弹窗
+const deptModal = reactive({
+  visible: false,
+  userId: '',
+  username: '',
+  departments: [] as string[],
+});
+
+function openDeptModal(u: UserResponse) {
+  deptModal.userId = u.id;
+  deptModal.username = u.username;
+  deptModal.departments = [...u.departments];
+  deptModal.visible = true;
+}
+
+async function confirmDeptChange() {
   try {
-    await updateUser(u.id, { departments: depts });
+    await updateUser(deptModal.userId, { departments: deptModal.departments });
+    deptModal.visible = false;
     await fetchUsers();
+    message.success('部门已更新');
   } catch (err) {
-    alert((err as { message?: string })?.message ?? '修改失败');
+    message.error((err as { message?: string })?.message ?? '修改失败');
   }
 }
 
@@ -106,131 +127,180 @@ async function toggleStatus(u: UserResponse) {
   try {
     await updateUserStatus(u.id, next);
     await fetchUsers();
+    message.success(next === 'active' ? '已启用' : '已禁用');
   } catch (err) {
-    alert((err as { message?: string })?.message ?? '操作失败');
+    message.error((err as { message?: string })?.message ?? '操作失败');
   }
 }
+
+const tabItems = [
+  { key: 'users', label: '用户管理' },
+  { key: 'documents', label: '文档管理' },
+];
 
 onMounted(fetchUsers);
 </script>
 
 <template>
-  <div class="h-full overflow-y-auto bg-slate-50 p-4">
+  <div class="scrollbar-thin h-full overflow-y-auto bg-slate-50 p-6">
     <div class="mx-auto max-w-5xl">
-      <!-- Tab -->
-      <div class="mb-4 flex gap-1 border-b border-slate-200">
-        <button
-          class="border-b-2 px-4 py-2 text-sm font-medium"
-          :class="tab === 'users' ? 'border-brand text-brand-600' : 'border-transparent text-slate-500'"
-          @click="tab = 'users'"
-        >
-          用户管理
-        </button>
-        <button
-          class="border-b-2 px-4 py-2 text-sm font-medium"
-          :class="tab === 'documents' ? 'border-brand text-brand-600' : 'border-transparent text-slate-500'"
-          @click="tab = 'documents'"
-        >
-          文档管理
-        </button>
+      <!-- 页面头 -->
+      <div class="mb-4">
+        <h1 class="text-lg font-semibold text-slate-900">管理后台</h1>
+        <p class="mt-0.5 text-xs text-slate-400">管理用户、权限与文档资源</p>
       </div>
 
+      <a-tabs v-model:activeKey="activeTab" :items="tabItems" />
+
       <!-- 用户管理 -->
-      <div v-if="tab === 'users'">
-        <div class="mb-3 flex justify-between">
-          <h2 class="text-sm font-semibold text-slate-700">用户列表（{{ users.length }}）</h2>
-          <button
-            class="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
-            @click="showCreate = !showCreate"
-          >
-            {{ showCreate ? '取消' : '+ 创建用户' }}
-          </button>
+      <div
+        v-if="activeTab === 'users'"
+        class="rounded-lg border border-slate-200 bg-white p-4 shadow-soft"
+      >
+        <div class="mb-3 flex items-center justify-between">
+          <span class="text-sm font-semibold text-slate-700">
+            用户列表
+            <span class="font-normal text-slate-400">（{{ users.length }}）</span>
+          </span>
+          <a-button type="primary" size="small" @click="showCreate = !showCreate">
+            <template #icon><PlusOutlined /></template>
+            {{ showCreate ? '取消' : '创建用户' }}
+          </a-button>
         </div>
 
         <!-- 创建表单 -->
-        <div v-if="showCreate" class="mb-4 rounded-lg border border-slate-200 bg-white p-4">
-          <div class="grid grid-cols-2 gap-3">
-            <input v-model="createForm.username" placeholder="用户名" class="rounded-md border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand" />
-            <input v-model="createForm.password" type="password" placeholder="密码（≥6位）" class="rounded-md border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand" />
-            <input v-model="createForm.displayName" placeholder="显示名" class="rounded-md border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand" />
-            <select v-model="createForm.role" class="rounded-md border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand">
-              <option v-for="(label, key) in ROLE_LABELS" :key="key" :value="key">{{ label }}</option>
-            </select>
-          </div>
-          <div class="mt-3">
-            <div class="mb-1 text-xs text-slate-600">部门（可多选）</div>
-            <div class="flex flex-wrap gap-1.5">
-              <button
-                v-for="d in DEPARTMENTS"
-                :key="d"
-                class="rounded-full border px-2.5 py-1 text-xs"
-                :class="createForm.departments.includes(d) ? 'border-brand bg-brand-50 text-brand-700' : 'border-slate-300 text-slate-600'"
-                @click="toggleDept(d)"
-              >
-                {{ d }}
-              </button>
-            </div>
-          </div>
-          <div v-if="createError" class="mt-2 text-xs text-red-500">{{ createError }}</div>
-          <button class="mt-3 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" @click="submitCreate">创建</button>
-        </div>
+        <a-card
+          v-if="showCreate"
+          size="small"
+          :bordered="false"
+          class="mb-4"
+          style="background: #f8fafc;"
+        >
+          <a-form
+            ref="createFormRef"
+            :model="createForm"
+            :rules="createUserRules"
+            :label-col="{ style: { width: '80px' } }"
+            size="small"
+          >
+            <a-row :gutter="12">
+              <a-col :span="12">
+                <a-form-item name="username" label="用户名">
+                  <a-input v-model:value="createForm.username" placeholder="用户名" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item name="password" label="密码">
+                  <a-input-password v-model:value="createForm.password" placeholder="密码（≥6位）" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="12">
+              <a-col :span="12">
+                <a-form-item name="displayName" label="显示名">
+                  <a-input v-model:value="createForm.displayName" placeholder="显示名" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item name="role" label="角色">
+                  <a-select v-model:value="createForm.role" :options="roleOptions" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-form-item label="部门">
+              <a-select
+                v-model:value="createForm.departments"
+                mode="multiple"
+                :options="departmentOptions"
+                placeholder="可多选部门"
+                style="width: 100%;"
+              />
+            </a-form-item>
+            <a-form-item style="margin-bottom: 0;">
+              <a-button type="primary" @click="submitCreate">创建</a-button>
+            </a-form-item>
+          </a-form>
+        </a-card>
 
         <!-- 用户表格 -->
-        <div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <table class="w-full text-sm">
-            <thead class="bg-slate-50 text-xs text-slate-500">
-              <tr>
-                <th class="px-3 py-2 text-left">用户名</th>
-                <th class="px-3 py-2 text-left">显示名</th>
-                <th class="px-3 py-2 text-left">角色</th>
-                <th class="px-3 py-2 text-left">部门</th>
-                <th class="px-3 py-2 text-left">状态</th>
-                <th class="px-3 py-2 text-left">操作</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-if="usersLoading">
-                <td colspan="6" class="px-3 py-4 text-center text-xs text-slate-400">加载中…</td>
-              </tr>
-              <tr v-else-if="!users.length">
-                <td colspan="6" class="px-3 py-4 text-center text-xs text-slate-400">暂无用户</td>
-              </tr>
-              <tr v-for="u in users" :key="u.id" class="text-slate-700">
-                <td class="px-3 py-2 font-mono text-xs">{{ u.username }}</td>
-                <td class="px-3 py-2">{{ u.displayName }}</td>
-                <td class="px-3 py-2">
-                  <span class="rounded bg-slate-100 px-1.5 py-0.5 text-xs">{{ ROLE_LABELS[u.role] || u.role }}</span>
-                </td>
-                <td class="px-3 py-2 text-xs text-slate-500">{{ u.departments.join('、') || '—' }}</td>
-                <td class="px-3 py-2">
-                  <span class="rounded px-1.5 py-0.5 text-xs" :class="u.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
-                    {{ u.status === 'active' ? '启用' : '禁用' }}
-                  </span>
-                </td>
-                <td class="px-3 py-2">
-                  <div class="flex gap-2 text-xs">
-                    <button class="text-brand-600 hover:underline" @click="changeRole(u)">改角色</button>
-                    <button class="text-brand-600 hover:underline" @click="changeDepts(u)">改部门</button>
-                    <button class="text-slate-500 hover:underline" @click="toggleStatus(u)">
-                      {{ u.status === 'active' ? '禁用' : '启用' }}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <a-table
+          :columns="userTableColumns"
+          :data-source="users"
+          :loading="usersLoading"
+          :pagination="false"
+          row-key="id"
+          size="small"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'role'">
+              <a-tag>{{ ROLE_LABELS[record.role] || record.role }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'departments'">
+              <span class="text-xs text-slate-500">{{ record.departments.join('、') || '—' }}</span>
+            </template>
+            <template v-else-if="column.key === 'status'">
+              <a-tag :color="record.status === 'active' ? 'green' : 'red'">
+                {{ record.status === 'active' ? '启用' : '禁用' }}
+              </a-tag>
+            </template>
+            <template v-else-if="column.key === 'actions'">
+              <a-space :size="4">
+                <a-button type="link" size="small" @click="openRoleModal(record)">改角色</a-button>
+                <a-button type="link" size="small" @click="openDeptModal(record)">改部门</a-button>
+                <a-popconfirm
+                  :title="record.status === 'active' ? '确定禁用该用户？' : '确定启用该用户？'"
+                  ok-text="确认"
+                  cancel-text="取消"
+                  @confirm="toggleStatus(record)"
+                >
+                  <a-button type="link" size="small">
+                    {{ record.status === 'active' ? '禁用' : '启用' }}
+                  </a-button>
+                </a-popconfirm>
+              </a-space>
+            </template>
+          </template>
+        </a-table>
       </div>
 
       <!-- 文档管理 -->
-      <div v-else class="grid gap-4 md:grid-cols-2">
-        <div class="rounded-lg border border-slate-200 bg-white">
+      <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div class="rounded-lg border border-slate-200 bg-white shadow-soft">
           <DocumentUpload />
         </div>
-        <div class="rounded-lg border border-slate-200 bg-white">
+        <div class="rounded-lg border border-slate-200 bg-white shadow-soft">
           <DocumentList admin />
         </div>
       </div>
     </div>
+
+    <!-- 角色修改弹窗 -->
+    <a-modal
+      v-model:open="roleModal.visible"
+      title="修改角色"
+      ok-text="确认"
+      cancel-text="取消"
+      @ok="confirmRoleChange"
+    >
+      <p class="mb-3 text-sm text-slate-500">用户：{{ roleModal.username }}</p>
+      <a-select v-model:value="roleModal.role" :options="roleOptions" style="width: 100%;" />
+    </a-modal>
+
+    <!-- 部门修改弹窗 -->
+    <a-modal
+      v-model:open="deptModal.visible"
+      title="修改部门"
+      ok-text="确认"
+      cancel-text="取消"
+      @ok="confirmDeptChange"
+    >
+      <p class="mb-3 text-sm text-slate-500">用户：{{ deptModal.username }}</p>
+      <a-select
+        v-model:value="deptModal.departments"
+        mode="multiple"
+        :options="departmentOptions"
+        style="width: 100%;"
+      />
+    </a-modal>
   </div>
 </template>

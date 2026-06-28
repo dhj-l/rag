@@ -100,6 +100,23 @@ export class LlmService {
     return this.chat([new SystemMessage(systemPrompt), new HumanMessage(userQuery)]);
   }
 
+  /**
+   * 轻量估算文本 token 数（F-11 token 用量统计）
+   *
+   * 用途：为 message.tokenCount 提供便于审计/分析的估算值。
+   * 精确 token 用量由 Langfuse 通过模型 callback 记录（F-11 链路追踪），
+   * 此处仅做粗估，避免引入 tiktoken 等重依赖。
+   *
+   * 经验规则（DeepSeek/通义等 BPE 分词）：
+   * - 中文约 1.5~2 token/字符
+   * - 英文/数字约 0.25 token/字符（4 字符/token）
+   * 中英混合文档折中取 chars/2，结果偏高但量级正确。
+   */
+  estimateTokens(text: string): number {
+    if (!text) return 0;
+    return Math.ceil(text.length / 2);
+  }
+
   private ensureConfigured(): void {
     if (!this.configured) {
       throw new Error('LLM 服务未配置：请设置 DEEPSEEK_API_KEY 环境变量');

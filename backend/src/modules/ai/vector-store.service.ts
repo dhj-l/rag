@@ -101,16 +101,30 @@ export class VectorStoreService implements OnModuleInit {
   /**
    * 将 VectorFilter 转换为 Chroma where 语法（§3.3 Chroma 过滤条件示例）
    *
+   * 两层过滤：
+   * 1. 权限维度（保密级别 + 部门）：见下方 orClauses 构造。
+   * 2. 会话关联文档维度（F-15）：若 filter.documentIds 非空，叠加
+   *    `documentId IN documentIds`，将检索收窄到会话关联文档子空间。
+   *
    * @example employee(信息技术部) → { $or: [
    *   { securityLevel: "L1" },
    *   { $and: [{ securityLevel: "L2" }, { department: { $in: ["信息技术部", "all"] } }] }
    * ]}
    * @example ceo → {}（空对象，等同于不传 filter）
+   * @example employee + 关联文档 [d1,d2] → { $and: [
+   *   { $or: [权限条件...] }, { documentId: { $in: ["d1","d2"] } }
+   * ] }
    */
   private buildChromaFilter(filter: VectorFilter): Where | undefined {
+    // F-15：会话关联文档限定子句
+    const hasDocIdLimit = !!(filter.documentIds && filter.documentIds.length > 0);
+    const docIdClause = hasDocIdLimit
+      ? ({ documentId: { $in: filter.documentIds } } as unknown as Where)
+      : undefined;
+
+    // admin / ceo 无权限维度限制：仅当有关联文档时限定文档范围，否则全库
     if (filter.noRestriction) {
-      // admin / ceo：不附加过滤条件，全库检索
-      return undefined;
+      return docIdClause;
     }
 
     const { accessibleLevels, departments } = filter;
@@ -135,13 +149,21 @@ export class VectorStoreService implements OnModuleInit {
       orClauses.push({ securityLevel: { $in: deptLevels } } as unknown as Where);
     }
 
+    // 权限维度 where
+    let permissionWhere: Where;
     if (orClauses.length === 0) {
       // 理论上不会发生，兜底返回永不命中条件
-      return { securityLevel: '__none__' };
+      permissionWhere = { securityLevel: '__none__' };
+    } else if (orClauses.length === 1) {
+      permissionWhere = orClauses[0];
+    } else {
+      permissionWhere = { $or: orClauses };
     }
-    if (orClauses.length === 1) {
-      return orClauses[0];
+
+    // F-15：叠加会话关联文档限定（权限条件 AND documentId IN [...]）
+    if (docIdClause) {
+      return { $and: [permissionWhere, docIdClause] } as unknown as Where;
     }
-    return { $or: orClauses };
+    return permissionWhere;
   }
 }

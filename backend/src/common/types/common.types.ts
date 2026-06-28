@@ -36,11 +36,12 @@ export enum DocumentStatus {
   FAILED = 'failed',
 }
 
-/** 文件类型（§3.7） */
+/** 文件类型（§3.7；F-12 P1 新增 docx） */
 export enum FileType {
   PDF = 'pdf',
   TXT = 'txt',
   MARKDOWN = 'markdown',
+  DOCX = 'docx', // Word 文档（F-12，P1）
 }
 
 /** 消息角色（§3.7 / §3.2 messages） */
@@ -93,11 +94,16 @@ export interface JwtPayload {
  * - accessibleLevels: 该角色可访问的保密级别
  * - departments: 用户所属部门（用于 L2/L3 部门过滤）
  * - noRestriction: true 时不附加任何过滤条件（ADMIN / CEO 全库检索）
+ * - documentIds: 可选，会话关联文档限定（F-15 多文档问答）。
+ *   非空时，在权限过滤基础上额外限定检索范围为这些文档的 chunk 子空间；
+ *   PRD §2.3 要求"多文档问答仅可关联有权限的文档"，关联时已做权限校验，
+ *   此处叠加 documentId IN documentIds 仅用于收窄检索范围。
  */
 export interface VectorFilter {
   accessibleLevels: SecurityLevel[];
   departments: string[];
   noRestriction: boolean;
+  documentIds?: string[]; // F-15：会话关联文档限定（可选）
 }
 
 /**
@@ -169,6 +175,17 @@ export interface ChunkMetadata {
   department: string; // L1/L4 为 'all'，L2/L3 为具体部门名
   title: string;
   page: number; // 仅 PDF，其他类型为 0
+}
+
+/**
+ * 文档加载结果（DocumentLoader.load 返回值）
+ * - text: 全文合并文本（供摘要等需要整体内容的场景使用）
+ * - pages: 可选，逐页文本（仅 PDFLoader 提供，用于精确按页分块，F-P04 来源引用页码）
+ *   未提供 pages 时（TXT/MD/DOCX），分块 page 字段统一为 0。
+ */
+export interface LoadedContent {
+  text: string;
+  pages?: Array<{ num: number; text: string }>; // 1-based 页码 + 该页文本
 }
 
 /** 文本分块（DocumentProcessorService 输出） */

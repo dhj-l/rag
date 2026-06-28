@@ -22,7 +22,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role, UserContext } from '../../common/types/common.types';
 import { deriveFileType } from './document.service';
 import { DocumentService } from './document.service';
-import { DocumentListQueryDto, UpdateDocumentSecurityDto, UploadDocumentDto } from './dto/document.dto';
+import { DocumentListQueryDto, SummarizeRangeDto, UpdateDocumentSecurityDto, UploadDocumentDto } from './dto/document.dto';
 
 /**
  * Multer fileFilter：MIME + 扩展名双校验（§7.5）
@@ -39,6 +39,7 @@ const documentFileFilter = (
     'text/plain',
     'text/markdown',
     'application/octet-stream', // 部分系统对 .md/.txt 的兜底 MIME
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // F-12 .docx
   ];
   if (fileType && allowedMime.includes(file.mimetype)) {
     cb(null, true);
@@ -97,6 +98,20 @@ export class DocumentController {
   }
 
   /**
+   * 问答热度统计（US-F7 / Q-E04，GET /api/documents/heat，admin）
+   *
+   * - 权限：admin。
+   * - 响应 data：`[{ documentId, title, questionCount, lastAskedAt }]`，
+   *   按被提问次数倒序；已删除文档标题标记"已删除"并保留计数。
+   * - 用途：管理员了解新员工常见困惑点，针对性优化文档。
+   */
+  @Get('heat')
+  @Roles(Role.ADMIN)
+  getHeat() {
+    return this.documentService.getHeat();
+  }
+
+  /**
    * 查询文档索引状态（GET /api/documents/:id/status，需登录）
    *
    * - 权限：需登录；需对文档有访问权限（canAccessDocument），否则 403。
@@ -122,6 +137,25 @@ export class DocumentController {
   @Get(':id/summary')
   getSummary(@Param('id') id: string, @CurrentUser() user: UserContext) {
     return this.documentService.getSummary(id, user);
+  }
+
+  /**
+   * 段落级摘要（F-13，POST /api/documents/:id/summary，需登录）
+   *
+   * - 权限：需登录；需对文档有摘要查看权限（canViewSummary），否则 403。
+   * - 请求体：SummarizeRangeDto（startPage / endPage，1-based 闭区间，均可选）。
+   *   仅 PDF 按页码范围截取生成局部摘要；非 PDF 退化为全文摘要。
+   * - 响应 data：`{ summary, documentTitle }`。
+   * - 副作用：记录 SUMMARIZE 审计（filterCondition 含页范围）。
+   * - 错误：404 文档不存在 / 文件不可用；403 无权限；400 页码范围越界。
+   */
+  @Post(':id/summary')
+  summarizeRange(
+    @Param('id') id: string,
+    @Body() dto: SummarizeRangeDto,
+    @CurrentUser() user: UserContext,
+  ) {
+    return this.documentService.summarizeRange(id, dto, user);
   }
 
   /**

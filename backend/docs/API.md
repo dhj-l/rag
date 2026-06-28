@@ -1,10 +1,10 @@
 # 智能文档助手 后端接口调用文档
 
 > 后端基于 NestJS + Mongoose + LangChain，提供认证、用户管理、会话、流式对话、文档管理与检索、审计日志等 HTTP 接口。
-> 本文档覆盖全部 **20 个** HTTP 端点，含鉴权说明、请求/响应示例、错误码与枚举速查。
+> 本文档覆盖全部 **22 个** HTTP 端点（含 F-13 段落级摘要、F-15 会话关联文档、问答热度统计），含鉴权说明、请求/响应示例、错误码与枚举速查。
 > 代码注释与架构章节引用见 `prd和架构设计/ARCHITECTURE.md`（§3.6 接口契约）。
 
----
+***
 
 ## 目录
 
@@ -24,7 +24,7 @@
 - [10. 错误码总表](#10-错误码总表)
 - [11. 附录](#11-附录)
 
----
+***
 
 ## 1. 概述
 
@@ -83,7 +83,7 @@ Authorization: Bearer <token>
 
 校验失败返回 `400`，`message` 为 class-validator 的中文提示。
 
----
+***
 
 ## 2. 枚举速查表
 
@@ -91,83 +91,83 @@ Authorization: Bearer <token>
 
 ### Role 角色
 
-| 值 | 含义 |
-| --- | --- |
-| `employee` | 普通员工 |
-| `manager` | 部门主管 |
-| `ceo` | CEO / 高管 |
-| `admin` | 管理员 |
+| 值          | 含义       |
+| ---------- | -------- |
+| `employee` | 普通员工     |
+| `manager`  | 部门主管     |
+| `ceo`      | CEO / 高管 |
+| `admin`    | 管理员      |
 
 ### SecurityLevel 保密级别
 
-| 值 | 含义 |
-| --- | --- |
+| 值    | 含义   |
+| ---- | ---- |
 | `L1` | 全员公开 |
 | `L2` | 部门内部 |
-| `L3` | 保密 |
-| `L4` | 机密 |
+| `L3` | 保密   |
+| `L4` | 机密   |
 
 ### 角色 × 保密级别 权限矩阵
 
 （`ROLE_ACCESSIBLE_LEVELS`，§3.8）
 
-| 角色 | 可访问保密级别 |
-| --- | --- |
-| `employee` | L1, L2 |
-| `manager` | L1, L2, L3 |
-| `ceo` | L1, L2, L3, L4 |
-| `admin` | L1, L2, L3, L4 |
+| 角色         | 可访问保密级别        |
+| ---------- | -------------- |
+| `employee` | L1, L2         |
+| `manager`  | L1, L2, L3     |
+| `ceo`      | L1, L2, L3, L4 |
+| `admin`    | L1, L2, L3, L4 |
 
 > L2/L3 文档还需「部门匹配」才可访问；L1/L4 的 `department` 固定为 `all`。
 
 ### DocumentStatus 文档处理状态
 
-| 值 | 含义 |
-| --- | --- |
-| `uploaded` | 已上传，待处理 |
-| `parsing` | 解析中 |
-| `embedding` | 向量化中 |
-| `completed` | 处理完成 |
-| `failed` | 处理失败（见 errorMessage） |
+| 值           | 含义                   |
+| ----------- | -------------------- |
+| `uploaded`  | 已上传，待处理              |
+| `parsing`   | 解析中                  |
+| `embedding` | 向量化中                 |
+| `completed` | 处理完成                 |
+| `failed`    | 处理失败（见 errorMessage） |
 
 ### FileType 文件类型
 
-| 值 | 含义 |
-| --- | --- |
-| `pdf` | PDF |
-| `txt` | 纯文本 |
+| 值          | 含义                        |
+| ---------- | ------------------------- |
+| `pdf`      | PDF                       |
+| `txt`      | 纯文本                       |
 | `markdown` | Markdown（.md / .markdown） |
 
 ### UserStatus 用户状态
 
-| 值 | 含义 |
-| --- | --- |
-| `active` | 启用 |
+| 值          | 含义 |
+| ---------- | -- |
+| `active`   | 启用 |
 | `disabled` | 禁用 |
 
 ### AuditAction 审计操作类型
 
-| 值 | 含义 |
-| --- | --- |
-| `search` | RAG 检索 |
-| `view_document` | 查看文档 |
-| `summarize` | 生成摘要 |
-| `upload` | 上传 / 重索引 |
-| `delete` | 删除 |
-| `login` | 登录 |
-| `role_change` | 角色变更 / 用户创建 / 启停 |
+| 值               | 含义               |
+| --------------- | ---------------- |
+| `search`        | RAG 检索           |
+| `view_document` | 查看文档             |
+| `summarize`     | 生成摘要             |
+| `upload`        | 上传 / 重索引         |
+| `delete`        | 删除               |
+| `login`         | 登录               |
+| `role_change`   | 角色变更 / 用户创建 / 启停 |
 
 ### SSEEventType 对话事件类型
 
-| 值 | 含义 |
-| --- | --- |
-| `token` | 增量文本片段 |
+| 值         | 含义     |
+| --------- | ------ |
+| `token`   | 增量文本片段 |
 | `sources` | 检索来源引用 |
-| `tool` | 触发的工具名 |
-| `error` | 异常信息 |
-| `done` | 流结束标记 |
+| `tool`    | 触发的工具名 |
+| `error`   | 异常信息   |
+| `done`    | 流结束标记  |
 
----
+***
 
 ## 3. 认证模块 Auth
 
@@ -188,10 +188,10 @@ Authorization: Bearer <token>
 }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `username` | string | 是 | 用户名 |
-| `password` | string | 是 | 明文密码（≥1 位） |
+| 字段         | 类型     | 必填 | 说明         |
+| ---------- | ------ | -- | ---------- |
+| `username` | string | 是  | 用户名        |
+| `password` | string | 是  | 明文密码（≥1 位） |
 
 **成功响应** `data`
 
@@ -213,9 +213,9 @@ Authorization: Bearer <token>
 
 **可能错误**
 
-| 状态码 | message | 触发场景 |
-| --- | --- | --- |
-| 401 | 用户名或密码错误 | 用户名不存在或密码不匹配 |
+| 状态码 | message       | 触发场景                 |
+| --- | ------------- | -------------------- |
+| 401 | 用户名或密码错误      | 用户名不存在或密码不匹配         |
 | 403 | 账号已被禁用，请联系管理员 | 用户 status 为 disabled |
 
 **curl**
@@ -250,7 +250,7 @@ curl http://localhost:3000/api/auth/profile \
   -H "Authorization: Bearer <token>"
 ```
 
----
+***
 
 ## 4. 用户管理模块 User
 
@@ -263,10 +263,10 @@ curl http://localhost:3000/api/auth/profile \
 
 **查询参数**
 
-| 参数 | 类型 | 必填 | 默认 | 说明 |
-| --- | --- | --- | --- | --- |
-| `page` | number | 否 | 1 | 页码，最小 1 |
-| `pageSize` | number | 否 | 20 | 每页条数，最小 1 |
+| 参数         | 类型     | 必填 | 默认 | 说明        |
+| ---------- | ------ | -- | -- | --------- |
+| `page`     | number | 否  | 1  | 页码，最小 1   |
+| `pageSize` | number | 否  | 20 | 每页条数，最小 1 |
 
 **成功响应** `data`
 
@@ -313,21 +313,21 @@ curl "http://localhost:3000/api/users?page=1&pageSize=20" \
 }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `username` | string | 是 | 全局唯一 |
-| `password` | string | 是 | 明文，≥6 位，后端 bcrypt 哈希 |
-| `displayName` | string | 是 | 显示名 |
-| `role` | Role | 是 | employee / manager / ceo / admin |
-| `departments` | string[] | 是 | 所属部门数组 |
+| 字段            | 类型        | 必填 | 说明                               |
+| ------------- | --------- | -- | -------------------------------- |
+| `username`    | string    | 是  | 全局唯一                             |
+| `password`    | string    | 是  | 明文，≥6 位，后端 bcrypt 哈希             |
+| `displayName` | string    | 是  | 显示名                              |
+| `role`        | Role      | 是  | employee / manager / ceo / admin |
+| `departments` | string\[] | 是  | 所属部门数组                           |
 
 **成功响应** `data`：`UserResponse`（创建后默认 `status: active`）
 
 **可能错误**
 
-| 状态码 | message | 触发场景 |
-| --- | --- | --- |
-| 409 | 用户名已存在 | username 已被占用 |
+| 状态码 | message | 触发场景          |
+| --- | ------- | ------------- |
+| 409 | 用户名已存在  | username 已被占用 |
 
 **curl**
 
@@ -344,8 +344,8 @@ curl -X POST http://localhost:3000/api/users \
 
 **路径参数**
 
-| 参数 | 说明 |
-| --- | --- |
+| 参数   | 说明          |
+| ---- | ----------- |
 | `id` | 用户 ObjectId |
 
 **请求体**（字段均可选，至少传一个）
@@ -361,9 +361,9 @@ curl -X POST http://localhost:3000/api/users \
 
 **可能错误**
 
-| 状态码 | message | 触发场景 |
-| --- | --- | --- |
-| 404 | 用户不存在 | id 无效 |
+| 状态码 | message | 触发场景  |
+| --- | ------- | ----- |
+| 404 | 用户不存在   | id 无效 |
 
 **curl**
 
@@ -386,9 +386,9 @@ curl -X PATCH http://localhost:3000/api/users/665f1a2b3c4d5e6f7a8b9c0d \
 { "status": "disabled" }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `status` | UserStatus | 是 | active / disabled |
+| 字段       | 类型         | 必填 | 说明                |
+| -------- | ---------- | -- | ----------------- |
+| `status` | UserStatus | 是  | active / disabled |
 
 **成功响应** `data`：`UserResponse`（更新后）
 
@@ -403,7 +403,7 @@ curl -X PATCH http://localhost:3000/api/users/665f1a2b3c4d5e6f7a8b9c0d/status \
   -d '{"status":"disabled"}'
 ```
 
----
+***
 
 ## 5. 会话模块 Session
 
@@ -420,9 +420,9 @@ curl -X PATCH http://localhost:3000/api/users/665f1a2b3c4d5e6f7a8b9c0d/status \
 { "title": "如何使用系统" }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `title` | string | 否 | 缺省为「新会话」；首条消息后自动取前 20 字命名 |
+| 字段      | 类型     | 必填 | 说明                        |
+| ------- | ------ | -- | ------------------------- |
+| `title` | string | 否  | 缺省为「新会话」；首条消息后自动取前 20 字命名 |
 
 **成功响应** `data`
 
@@ -451,10 +451,10 @@ curl -X POST http://localhost:3000/api/sessions \
 
 **查询参数**
 
-| 参数 | 类型 | 必填 | 默认 | 说明 |
-| --- | --- | --- | --- | --- |
-| `page` | number | 否 | 1 | 页码 |
-| `pageSize` | number | 否 | 50 | 每页条数 |
+| 参数         | 类型     | 必填 | 默认 | 说明   |
+| ---------- | ------ | -- | -- | ---- |
+| `page`     | number | 否  | 1  | 页码   |
+| `pageSize` | number | 否  | 50 | 每页条数 |
 
 **成功响应** `data`：`{ list: SessionResponse[], total }`，按 `updatedAt` 倒序。
 
@@ -513,9 +513,9 @@ curl "http://localhost:3000/api/sessions?page=1&pageSize=50" \
 
 **可能错误**
 
-| 状态码 | message | 触发场景 |
-| --- | --- | --- |
-| 404 | 会话不存在 | id 无效或不属于本人 |
+| 状态码 | message | 触发场景        |
+| --- | ------- | ----------- |
+| 404 | 会话不存在   | id 无效或不属于本人 |
 
 ### 5.4 重命名会话
 
@@ -527,9 +527,9 @@ curl "http://localhost:3000/api/sessions?page=1&pageSize=50" \
 { "title": "新标题" }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `title` | string | 是 | 必填非空 |
+| 字段      | 类型     | 必填 | 说明   |
+| ------- | ------ | -- | ---- |
+| `title` | string | 是  | 必填非空 |
 
 **成功响应** `data`：`SessionResponse`（更新后）
 
@@ -552,7 +552,7 @@ curl -X DELETE http://localhost:3000/api/sessions/6670a1b2c3d4e5f6a7b8c9d0 \
   -H "Authorization: Bearer <token>"
 ```
 
----
+***
 
 ## 6. 对话模块 Chat（SSE）
 
@@ -580,9 +580,9 @@ Accept: text/event-stream
 { "message": "如何上传文档？" }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `message` | string | 是 | 用户提问，非空 |
+| 字段        | 类型     | 必填 | 说明      |
+| --------- | ------ | -- | ------- |
+| `message` | string | 是  | 用户提问，非空 |
 
 **响应**：`Content-Type: text/event-stream`，逐帧下发，**不经过统一响应信封**。每帧格式为：
 
@@ -592,13 +592,13 @@ data: {"type":"...","content":"..."}\n\n
 
 **事件类型**
 
-| type | 携带字段 | 说明 |
-| --- | --- | --- |
-| `token` | `content` | 增量文本片段，前端拼接展示 |
+| type      | 携带字段                      | 说明                                                                                |
+| --------- | ------------------------- | --------------------------------------------------------------------------------- |
+| `token`   | `content`                 | 增量文本片段，前端拼接展示                                                                     |
 | `sources` | `data: SourceReference[]` | RAG 检索到的来源引用（documentId/documentTitle/chunkContent/chunkIndex/page/securityLevel） |
-| `tool` | `name` | 触发的工具名（`rag_search` / `summarize_document` / `general_chat`） |
-| `error` | `message` | 流中异常信息 |
-| `done` | — | 流结束标记 |
+| `tool`    | `name`                    | 触发的工具名（`rag_search` / `summarize_document` / `general_chat`）                      |
+| `error`   | `message`                 | 流中异常信息                                                                            |
+| `done`    | —                         | 流结束标记                                                                             |
 
 **事件序列示例**
 
@@ -620,10 +620,10 @@ data: {"type":"done"}
 
 **可能错误**
 
-| 状态码 | message | 触发场景 |
-| --- | --- | --- |
-| 404 | 会话不存在 | id 无效或不属于本人 |
-| —（error 事件） | 异常信息 | 流式过程中的内部异常，以 `{"type":"error","message":"..."}` 事件下发而非 HTTP 错误码 |
+| 状态码         | message | 触发场景                                                            |
+| ----------- | ------- | --------------------------------------------------------------- |
+| 404         | 会话不存在   | id 无效或不属于本人                                                     |
+| —（error 事件） | 异常信息    | 流式过程中的内部异常，以 `{"type":"error","message":"..."}` 事件下发而非 HTTP 错误码 |
 
 **前端消费示例**（`@microsoft/fetch-event-source`，支持 POST + 自定义头）
 
@@ -662,7 +662,7 @@ curl -N -X POST http://localhost:3000/api/sessions/6670a1b2c3d4e5f6a7b8c9d0/chat
 
 > `-N` 禁用缓冲，实时输出 SSE 帧。
 
----
+***
 
 ## 7. 文档模块 Document
 
@@ -675,14 +675,14 @@ curl -N -X POST http://localhost:3000/api/sessions/6670a1b2c3d4e5f6a7b8c9d0/chat
 
 **请求体**（multipart）
 
-| 字段 | 位置 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- | --- |
-| `file` | 文件 | binary | 是 | pdf/txt/md/markdown，≤20MB |
-| `title` | 表单 | string | 是 | 文档标题 |
-| `securityLevel` | 表单 | SecurityLevel | 是 | L1/L2/L3/L4 |
-| `department` | 表单 | string | L2/L3 必填 | 所属部门；L1/L4 可省略，默认 `all` |
+| 字段              | 位置 | 类型            | 必填       | 说明                        |
+| --------------- | -- | ------------- | -------- | ------------------------- |
+| `file`          | 文件 | binary        | 是        | pdf/txt/md/markdown/docx，≤20MB |
+| `title`         | 表单 | string        | 是        | 文档标题                      |
+| `securityLevel` | 表单 | SecurityLevel | 是        | L1/L2/L3/L4               |
+| `department`    | 表单 | string        | L2/L3 必填 | 所属部门；L1/L4 可省略，默认 `all`   |
 
-**文件类型约束**：扩展名与 MIME 双校验（`documentFileFilter`）。允许 `.pdf / .txt / .md / .markdown`，MIME 含 `application/pdf`、`text/plain`、`text/markdown`、`application/octet-stream`（兜底）。
+**文件类型约束**：扩展名与 MIME 双校验（`documentFileFilter`）。允许 `.pdf / .txt / .md / .markdown / .docx`，MIME 含 `application/pdf`、`text/plain`、`text/markdown`、`application/octet-stream`（兜底）、`application/vnd.openxmlformats-officedocument.wordprocessingml.document`（.docx，F-12）。
 
 **成功响应** `data`（HTTP 201）
 
@@ -697,11 +697,11 @@ curl -N -X POST http://localhost:3000/api/sessions/6670a1b2c3d4e5f6a7b8c9d0/chat
 
 **可能错误**
 
-| 状态码 | message | 触发场景 |
-| --- | --- | --- |
-| 400 | 未收到上传文件 | 缺少 file 字段 |
-| 400 | 不支持的文件类型，仅允许 pdf/txt/md/markdown | 扩展名/MIME 不在白名单 |
-| 413 | 文件大小不能超过 20MB | 超过大小限制 |
+| 状态码 | message                          | 触发场景           |
+| --- | -------------------------------- | -------------- |
+| 400 | 未收到上传文件                          | 缺少 file 字段     |
+| 400 | 不支持的文件类型，仅允许 pdf/txt/md/markdown/docx | 扩展名/MIME 不在白名单 |
+| 413 | 文件大小不能超过 20MB                    | 超过大小限制         |
 
 **curl**
 
@@ -721,10 +721,10 @@ curl -X POST http://localhost:3000/api/documents/upload \
 
 **查询参数**
 
-| 参数 | 类型 | 必填 | 默认 | 说明 |
-| --- | --- | --- | --- | --- |
-| `page` | number | 否 | 1 | 页码 |
-| `pageSize` | number | 否 | 20 | 每页条数 |
+| 参数         | 类型     | 必填 | 默认 | 说明   |
+| ---------- | ------ | -- | -- | ---- |
+| `page`     | number | 否  | 1  | 页码   |
+| `pageSize` | number | 否  | 20 | 每页条数 |
 
 **成功响应** `data`
 
@@ -779,9 +779,9 @@ curl "http://localhost:3000/api/documents?page=1&pageSize=20" \
 
 **可能错误**
 
-| 状态码 | message | 触发场景 |
-| --- | --- | --- |
-| 404 | 文档不存在 | id 无效 |
+| 状态码 | message   | 触发场景  |
+| --- | --------- | ----- |
+| 404 | 文档不存在     | id 无效 |
 | 403 | 没有权限访问该文档 | 无访问权限 |
 
 ### 7.4 获取文档摘要
@@ -805,11 +805,11 @@ curl "http://localhost:3000/api/documents?page=1&pageSize=20" \
 
 **可能错误**
 
-| 状态码 | message | 触发场景 |
-| --- | --- | --- |
-| 404 | 文档不存在 | id 无效 |
-| 404 | 文档文件不可用 | 文件路径缺失或已删除 |
-| 403 | 没有权限查看该文档摘要 | 无摘要查看权限 |
+| 状态码 | message     | 触发场景       |
+| --- | ----------- | ---------- |
+| 404 | 文档不存在       | id 无效      |
+| 404 | 文档文件不可用     | 文件路径缺失或已删除 |
+| 403 | 没有权限查看该文档摘要 | 无摘要查看权限    |
 
 ### 7.5 调整文档保密级别/部门（重索引）
 
@@ -825,18 +825,18 @@ curl "http://localhost:3000/api/documents?page=1&pageSize=20" \
 { "securityLevel": "L2", "department": "研发部" }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `securityLevel` | SecurityLevel | 是 | 新保密级别 |
-| `department` | string | L2/L3 必填 | 新所属部门；L1/L4 可省略，默认 `all` |
+| 字段              | 类型            | 必填       | 说明                       |
+| --------------- | ------------- | -------- | ------------------------ |
+| `securityLevel` | SecurityLevel | 是        | 新保密级别                    |
+| `department`    | string        | L2/L3 必填 | 新所属部门；L1/L4 可省略，默认 `all` |
 
 **成功响应** `data`：`DocumentResponse`（`status` 回到 `uploaded`/`parsing`，触发重索引）
 
 **可能错误**
 
-| 状态码 | message | 触发场景 |
-| --- | --- | --- |
-| 404 | 文档不存在 | id 无效 |
+| 状态码 | message        | 触发场景       |
+| --- | -------------- | ---------- |
+| 404 | 文档不存在          | id 无效      |
 | 400 | 文档文件不可用，无法重新索引 | 文件路径缺失或已删除 |
 
 ### 7.6 删除文档
@@ -853,9 +853,9 @@ best-effort 删除文件 + 向量库索引 + MongoDB 记录。
 
 **可能错误**
 
-| 状态码 | message | 触发场景 |
-| --- | --- | --- |
-| 404 | 文档不存在 | id 无效 |
+| 状态码 | message | 触发场景  |
+| --- | ------- | ----- |
+| 404 | 文档不存在   | id 无效 |
 
 **curl**
 
@@ -864,7 +864,7 @@ curl -X DELETE http://localhost:3000/api/documents/666e1a2b3c4d5e6f7a8b9c0e \
   -H "Authorization: Bearer <admin-token>"
 ```
 
----
+***
 
 ## 8. 审计模块 Audit
 
@@ -876,12 +876,12 @@ curl -X DELETE http://localhost:3000/api/documents/666e1a2b3c4d5e6f7a8b9c0e \
 
 **查询参数**（均可选）
 
-| 参数 | 类型 | 说明 |
-| --- | --- | --- |
-| `page` | number | 页码，默认 1 |
-| `pageSize` | number | 每页条数，默认 20 |
-| `action` | AuditAction | 精确过滤（search/view_document/summarize/upload/delete/login/role_change） |
-| `username` | string | 用户名模糊匹配，大小写不敏感 |
+| 参数         | 类型          | 说明                                                                     |
+| ---------- | ----------- | ---------------------------------------------------------------------- |
+| `page`     | number      | 页码，默认 1                                                                |
+| `pageSize` | number      | 每页条数，默认 20                                                             |
+| `action`   | AuditAction | 精确过滤（search/view\_document/summarize/upload/delete/login/role\_change） |
+| `username` | string      | 用户名模糊匹配，大小写不敏感                                                         |
 
 **成功响应** `data`
 
@@ -915,7 +915,7 @@ curl "http://localhost:3000/api/audit/logs?page=1&pageSize=20&action=login" \
   -H "Authorization: Bearer <admin-token>"
 ```
 
----
+***
 
 ## 9. 健康检查 Health
 
@@ -941,25 +941,25 @@ curl "http://localhost:3000/api/audit/logs?page=1&pageSize=20&action=login" \
 curl http://localhost:3000/health
 ```
 
----
+***
 
 ## 10. 错误码总表
 
-| HTTP 状态码 | 触发场景 | 典型接口 |
-| --- | --- | --- |
-| 200 | 请求成功（默认） | 所有 GET / PATCH / DELETE 成功 |
-| 201 | 资源创建成功 | `POST /api/documents/upload` |
-| 400 | 参数校验失败 / 文件类型不支持 / 文件不可用重新索引 | 所有接口（ValidationPipe）、上传、重索引 |
-| 401 | 未登录 / Token 失效 / 用户名或密码错误 | 登录、需登录接口 |
-| 403 | 无权限（角色不足 / 文档权限不足 / 账号禁用） | admin 接口、文档 status/summary、登录禁用账号 |
-| 404 | 资源不存在（会话/文档/用户不存在，或会话非本人） | 会话、文档、用户相关接口 |
-| 409 | 资源冲突（用户名已存在） | 创建用户 |
-| 413 | 文件超过 20MB | 上传文档 |
+| HTTP 状态码 | 触发场景                         | 典型接口                              |
+| -------- | ---------------------------- | --------------------------------- |
+| 200      | 请求成功（默认）                     | 所有 GET / PATCH / DELETE 成功        |
+| 201      | 资源创建成功                       | `POST /api/documents/upload`      |
+| 400      | 参数校验失败 / 文件类型不支持 / 文件不可用重新索引 | 所有接口（ValidationPipe）、上传、重索引       |
+| 401      | 未登录 / Token 失效 / 用户名或密码错误    | 登录、需登录接口                          |
+| 403      | 无权限（角色不足 / 文档权限不足 / 账号禁用）    | admin 接口、文档 status/summary、登录禁用账号 |
+| 404      | 资源不存在（会话/文档/用户不存在，或会话非本人）    | 会话、文档、用户相关接口                      |
+| 409      | 资源冲突（用户名已存在）                 | 创建用户                              |
+| 413      | 文件超过 20MB                    | 上传文档                              |
 
 > 错误响应统一为 `{ code, data: null, message }`，`message` 为中文提示。
 > 对话接口（SSE）的流中异常不返回 HTTP 错误码，而是以 `{"type":"error","message":"..."}` 事件下发。
 
----
+***
 
 ## 11. 附录
 
@@ -971,12 +971,12 @@ curl http://localhost:3000/health
 
 ### 11.2 保密级别与部门联动规则
 
-| 保密级别 | department 取值 | 访问范围 |
-| --- | --- | --- |
-| L1 | `all`（固定） | 全员可访问 |
-| L2 | 具体部门名（必填） | 同部门 + 更高权限角色 |
-| L3 | 具体部门名（必填） | 同部门 + 更高权限角色 |
-| L4 | `all`（固定） | 仅 ceo / admin |
+| 保密级别 | department 取值 | 访问范围          |
+| ---- | ------------- | ------------- |
+| L1   | `all`（固定）     | 全员可访问         |
+| L2   | 具体部门名（必填）     | 同部门 + 更高权限角色  |
+| L3   | 具体部门名（必填）     | 同部门 + 更高权限角色  |
+| L4   | `all`（固定）     | 仅 ceo / admin |
 
 - 上传（`UploadDocumentDto`）与重索引（`UpdateDocumentSecurityDto`）中，`securityLevel` 为 `L2`/`L3` 时 `department` 必填，否则 400。
 - `L1`/`L4` 的 `department` 后端固定为 `all`。
@@ -990,12 +990,13 @@ curl http://localhost:3000/health
 
 ### 11.4 相关源码索引
 
-| 关注点 | 文件 |
-| --- | --- |
-| 公共类型/枚举 | `src/common/types/common.types.ts` |
-| 统一响应拦截器 | `src/common/interceptors/transform.interceptor.ts` |
-| 异常过滤器 | `src/common/filters/http-exception.filter.ts` |
-| JWT 守卫 / 策略 | `src/common/guards/jwt-auth.guard.ts`、`src/modules/auth/jwt.strategy.ts` |
-| 角色守卫 / 装饰器 | `src/common/guards/roles.guard.ts`、`src/common/decorators/roles.decorator.ts` |
-| 当前用户装饰器 | `src/common/decorators/current-user.decorator.ts` |
-| 权限矩阵实现 | `src/modules/ai/permission.service.ts` |
+| 关注点         | 文件                                                                            |
+| ----------- | ----------------------------------------------------------------------------- |
+| 公共类型/枚举     | `src/common/types/common.types.ts`                                            |
+| 统一响应拦截器     | `src/common/interceptors/transform.interceptor.ts`                            |
+| 异常过滤器       | `src/common/filters/http-exception.filter.ts`                                 |
+| JWT 守卫 / 策略 | `src/common/guards/jwt-auth.guard.ts`、`src/modules/auth/jwt.strategy.ts`      |
+| 角色守卫 / 装饰器  | `src/common/guards/roles.guard.ts`、`src/common/decorators/roles.decorator.ts` |
+| 当前用户装饰器     | `src/common/decorators/current-user.decorator.ts`                             |
+| 权限矩阵实现      | `src/modules/ai/permission.service.ts`                                        |
+

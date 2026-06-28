@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsInt, IsMongoId, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
 
 /** 创建会话 DTO（§3.6 POST /api/sessions） */
 export class CreateSessionDto {
@@ -8,6 +8,16 @@ export class CreateSessionDto {
   @IsString()
   @IsNotEmpty({ message: '会话标题不能为空' })
   title?: string;
+
+  /**
+   * F-15 会话关联文档（多文档问答，可选）。
+   * 传入则限定本会话检索范围到这些文档；关联时后端校验文档存在且用户有权访问
+   * （PRD §2.3"仅可关联有权限的文档"）。
+   */
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true, message: '关联文档 ID 格式不正确' })
+  documentIds?: string[];
 }
 
 /** 重命名会话 DTO（§3.6 PATCH /api/sessions/:id） */
@@ -16,6 +26,12 @@ export class UpdateSessionDto {
   @IsString()
   @IsNotEmpty({ message: '会话标题不能为空' })
   title!: string;
+
+  /** F-15：更新会话关联文档（可选）；传入则替换原关联文档列表 */
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true, message: '关联文档 ID 格式不正确' })
+  documentIds?: string[];
 }
 
 /** 会话列表查询 DTO */

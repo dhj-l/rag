@@ -55,6 +55,18 @@ describe('PermissionService', () => {
         SecurityLevel.L3,
       ]);
     });
+
+    it('F-15: 传入 documentIds 时透传；空数组/不传为 undefined', () => {
+      // 传入非空数组 → 透传到 VectorFilter.documentIds
+      const withDocs = service.buildVectorFilter(employee, ['d1', 'd2']);
+      expect(withDocs.documentIds).toEqual(['d1', 'd2']);
+      // 空数组 → undefined（避免空数组造成语义歧义，等价于不限定）
+      const emptyDocs = service.buildVectorFilter(employee, []);
+      expect(emptyDocs.documentIds).toBeUndefined();
+      // 不传第二参数 → undefined
+      const noArg = service.buildVectorFilter(employee);
+      expect(noArg.documentIds).toBeUndefined();
+    });
   });
 
   describe('buildMongoQuery', () => {

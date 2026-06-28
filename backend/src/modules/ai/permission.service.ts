@@ -42,14 +42,21 @@ export class PermissionService {
    *
    * - noRestriction=true（admin/ceo）：向量检索不附加任何过滤。
    * - 其余角色：按 accessibleLevels + departments 过滤。
+   * - documentIds（F-15 可选）：会话关联文档限定，叠加在权限过滤之上，
+   *   用于把检索收窄到会话关联的文档子空间。调用方传入前需保证这些文档
+   *   均经 canAccessDocument 校验通过（PRD §2.3"仅可关联有权限的文档"）。
+   *
+   * @param documentIds 可选，会话关联的文档 ID 列表；不传或为空则不限定文档范围
    */
-  buildVectorFilter(user: UserContext): VectorFilter {
+  buildVectorFilter(user: UserContext, documentIds?: string[]): VectorFilter {
     const accessibleLevels = this.getAccessibleLevels(user.role);
     const noRestriction = !this.needsDepartmentFilter(user.role);
     return {
       accessibleLevels,
       departments: user.departments,
       noRestriction,
+      // 仅在传入非空数组时设置，避免 VectorFilter 携带空数组造成语义歧义
+      documentIds: documentIds && documentIds.length > 0 ? documentIds : undefined,
     };
   }
 

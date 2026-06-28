@@ -18,14 +18,21 @@ import { VectorStoreService } from '../ai/vector-store.service';
 import { LlmService } from '../ai/llm.service';
 import { AuditService } from '../audit/audit.service';
 import { Document, DocumentDocument, DocumentResponse } from './document.schema';
-import { UploadDocumentDto, DocumentListQueryDto, UpdateDocumentSecurityDto } from './dto/document.dto';
+import { Message, MessageDocument } from '../chat/message.schema';
+import {
+  UploadDocumentDto,
+  DocumentListQueryDto,
+  UpdateDocumentSecurityDto,
+  SummarizeRangeDto,
+} from './dto/document.dto';
 
-/** 扩展名 → FileType 映射（§7.5 支持格式） */
+/** 扩展名 → FileType 映射（§7.5 支持格式；F-12 新增 docx） */
 const EXT_FILE_TYPE: Record<string, FileType> = {
   '.pdf': FileType.PDF,
   '.txt': FileType.TXT,
   '.md': FileType.MARKDOWN,
   '.markdown': FileType.MARKDOWN,
+  '.docx': FileType.DOCX, // F-12 Word 文档
 };
 
 /** 由文件名推导 FileType；不支持返回 null */
@@ -48,6 +55,7 @@ export class DocumentService {
 
   constructor(
     @InjectModel(Document.name) private readonly documentModel: Model<DocumentDocument>,
+    @InjectModel(Message.name) private readonly messageModel: Model<MessageDocument>,
     private readonly permissionService: PermissionService,
     private readonly documentProcessorService: DocumentProcessorService,
     private readonly vectorStoreService: VectorStoreService,
@@ -185,6 +193,54 @@ export class DocumentService {
     return { list: docs.map((d) => this.toResponse(d)), total };
   }
 
+  /**
+   * 问答热度统计（US-F7 / Q-E04，P1；GET /api/documents/heat，admin）
+   *
+   * 聚合 messages 集合中 assistant 消息的 sources，按 documentId 统计被检索次数，
+   * 帮助管理员了解新员工常见困惑点（哪些文档被提问最多）。
+   * 已删除文档标题标记"已删除"并保留计数（热度仍反映历史提问）。
+   *
+   * 说明：统计口径为"文档作为检索来源出现的次数"——每次 rag_search 命中该文档的
+   * chunk 均计 1 次，反映文档被引用的活跃度。
+   */
+  async getHeat(): Promise<
+    Array<{ documentId: string; title: string; questionCount: number; lastAskedAt: Date }>
+  > {
+    // 聚合管道：assistant 消息 → 展开 sources → 按 documentId 分组计数 + 取最近时间
+    const rows = await this.messageModel.aggregate<{
+      _id: string;
+      questionCount: number;
+      lastAskedAt: Date;
+    }>([
+      { $match: { role: 'assistant', sources: { $exists: true, $ne: [] } } },
+      { $unwind: '$sources' },
+      {
+        $group: {
+          _id: '$sources.documentId',
+          questionCount: { $sum: 1 },
+          lastAskedAt: { $max: '$createdAt' },
+        },
+      },
+      { $sort: { questionCount: -1 } },
+    ]);
+
+    // 关联文档标题（文档数有限，内存 join 较聚合 lookup 更直观）
+    const docIds = rows.map((r) => r._id).filter(Boolean);
+    const docs = docIds.length
+      ? await this.documentModel.find({ _id: { $in: docIds } }).exec()
+      : [];
+    const titleMap = new Map(docs.map((d) => [String(d._id), d.title]));
+
+    return rows
+      .filter((r) => r._id)
+      .map((r) => ({
+        documentId: String(r._id),
+        title: titleMap.get(String(r._id)) ?? '（已删除）',
+        questionCount: r.questionCount,
+        lastAskedAt: r.lastAskedAt,
+      }));
+  }
+
   /** 查询索引状态（§3.6 GET /:id/status） */
   async findStatus(
     id: string,
@@ -225,8 +281,10 @@ export class DocumentService {
       throw new HttpException('文档文件不可用', HttpStatus.NOT_FOUND);
     }
 
-    const { readFileSync } = await import('fs');
-    const fileContent = readFileSync(doc.filePath, 'utf-8').slice(0, 8000);
+    // F-07 修复：复用 DocumentProcessorService.extractText 正确解析 PDF（pdf-parse），
+    // 避免早期 readFileSync(utf-8) 读 PDF 二进制导致的乱码
+    const content = await this.documentProcessorService.extractText(doc.filePath, doc.fileType);
+    const fileContent = content.text.slice(0, 8000); // 取前 8000 字符控制 token 用量
 
     const systemPrompt = `你是一个专业的文档摘要生成器。请用 200 字以内的简洁中文总结以下文档内容。
 只输出摘要文本，不要添加额外说明。`;
@@ -240,6 +298,78 @@ export class DocumentService {
       action: AuditAction.SUMMARIZE,
       resource: 'document',
       resourceId: String(doc._id),
+    });
+
+    return { summary, documentTitle: doc.title };
+  }
+
+  /**
+   * 段落级摘要（F-13，POST /api/documents/:id/summary）
+   *
+   * 按页码范围 [startPage, endPage] 截取文档内容生成局部摘要，
+   * 实现 PRD US-6 / F-13 验收"可选择目标段落生成局部摘要"。
+   * - 仅 PDF 有页码概念（extractText 返回 content.pages）；非 PDF 退化为全文摘要。
+   * - 页码越界校验：startPage/endPage 须在 [1, 总页数] 范围内且 start ≤ end。
+   * - 权限校验复用 canViewSummary；记录 SUMMARIZE 审计（filterCondition 含页范围）。
+   */
+  async summarizeRange(
+    id: string,
+    dto: SummarizeRangeDto,
+    user: UserContext,
+  ): Promise<{ summary: string; documentTitle: string }> {
+    const doc = await this.documentModel.findById(id).exec();
+    if (!doc) {
+      throw new HttpException('文档不存在', HttpStatus.NOT_FOUND);
+    }
+    if (!this.permissionService.canViewSummary(user, this.toPermissionDoc(doc))) {
+      throw new HttpException('没有权限查看该文档摘要', HttpStatus.FORBIDDEN);
+    }
+    if (!doc.filePath || !existsSync(doc.filePath)) {
+      throw new HttpException('文档文件不可用', HttpStatus.NOT_FOUND);
+    }
+
+    // 复用统一解析（含逐页 pages，F-07 修复 + F-P04 精确页码）
+    const content = await this.documentProcessorService.extractText(doc.filePath, doc.fileType);
+
+    // 确定要摘要的文本范围
+    let rangeText: string;
+    let rangeDesc: string;
+    if (content.pages && content.pages.length > 0) {
+      // PDF：按页码范围截取
+      const totalPages = content.pages.length;
+      const start = dto.startPage ?? 1;
+      const end = dto.endPage ?? totalPages;
+      if (start < 1 || end < 1 || start > totalPages || end > totalPages || start > end) {
+        throw new HttpException(
+          `页码范围无效，文档共 ${totalPages} 页`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      rangeText = content.pages
+        .filter((p) => p.num >= start && p.num <= end)
+        .map((p) => `【第${p.num}页】\n${p.text}`)
+        .join('\n\n')
+        .slice(0, 8000); // 控制 token 用量
+      rangeDesc = `第${start}-${end}页`;
+    } else {
+      // 非 PDF（TXT/MD/DOCX 无页码概念）：退化为全文摘要
+      rangeText = content.text.slice(0, 8000);
+      rangeDesc = '全文';
+    }
+
+    const systemPrompt = `你是一个专业的文档摘要生成器。请用 200 字以内的简洁中文总结以下文档内容。
+只输出摘要文本，不要添加额外说明。`;
+    const summary = await this.llmService.ask(
+      systemPrompt,
+      `文档标题：${doc.title}\n\n文档内容（${rangeDesc}）：\n${rangeText}`,
+    );
+
+    await this.auditService.record({
+      user,
+      action: AuditAction.SUMMARIZE,
+      resource: 'document',
+      resourceId: String(doc._id),
+      filterCondition: { range: rangeDesc, startPage: dto.startPage, endPage: dto.endPage },
     });
 
     return { summary, documentTitle: doc.title };
